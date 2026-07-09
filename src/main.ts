@@ -1,4 +1,4 @@
-import { App, MarkdownView, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { parse, Song, SongLine, transposeChord, transposeKey, isValidChord } from "./parser";
 import { clampCapo, scrollSpeedForDuration } from "./viewutils";
 import { Extension, RangeSetBuilder } from "@codemirror/state";
@@ -26,6 +26,7 @@ export default class LeadsheetPlugin extends Plugin {
   settings: LeadsheetSettings = DEFAULT_SETTINGS;
   private scrollEl: HTMLElement | null = null;
   private scrollRaf = 0;
+  private liveSpeed = 0; // px/s of the active scroll; adjustable mid-scroll
 
   async onload() {
     await this.loadSettings();
@@ -88,13 +89,13 @@ export default class LeadsheetPlugin extends Plugin {
     }
     this.scrollEl = el;
     const derived = scrollSpeedForDuration(el.scrollHeight - el.clientHeight, durationSec);
-    const speed = derived > 0 ? derived : this.settings.scrollSpeed;
+    this.liveSpeed = derived > 0 ? derived : this.settings.scrollSpeed;
     let pos = el.scrollTop;
     let lastTs = 0;
     const step = (ts: number) => {
       if (!this.scrollEl) return;
       if (lastTs) {
-        pos += (speed * (ts - lastTs)) / 1000;
+        pos += (this.liveSpeed * (ts - lastTs)) / 1000;
         this.scrollEl.scrollTop = pos;
         // stop at the bottom
         if (pos >= this.scrollEl.scrollHeight - this.scrollEl.clientHeight) {
@@ -113,6 +114,19 @@ export default class LeadsheetPlugin extends Plugin {
     this.scrollRaf = 0;
     this.scrollEl = null;
     document.body.dispatchEvent(new CustomEvent("leadsheet-scroll-stopped"));
+  }
+
+  // Change speed by delta px/s. Persists the manual fallback and, if a scroll
+  // is running, applies live so the sheet speeds up/slows without restarting.
+  adjustSpeed(delta: number) {
+    this.settings.scrollSpeed = Math.max(5, this.settings.scrollSpeed + delta);
+    if (this.scrollEl) this.liveSpeed = Math.max(5, this.liveSpeed + delta);
+    this.saveSettings();
+    document.body.dispatchEvent(new CustomEvent("leadsheet-speed-changed"));
+  }
+
+  currentSpeed(): number {
+    return Math.round(this.scrollEl ? this.liveSpeed : this.settings.scrollSpeed);
   }
 
   async loadSettings() {
@@ -146,21 +160,24 @@ function renderLeadsheet(
     if (plugin.isScrolling()) plugin.stopAutoscroll();
   });
 
-  // --- metadata ---
+  // --- metadata (icon chips) ---
   const titleBox = toolbar.createDiv({ cls: "ls-titlebox" });
   if (song.meta.title) titleBox.createSpan({ cls: "ls-title", text: song.meta.title });
   if (song.meta.artist) titleBox.createSpan({ cls: "ls-meta", text: song.meta.artist });
 
-  const keyLabel = toolbar.createSpan({ cls: "ls-meta ls-key" });
+  const keyChip = metaChip(toolbar, "music", "", "Key");
+  const keyText = keyChip.querySelector(".ls-chip-text") as HTMLElement;
+
   const { capo, bad: capoBad } = clampCapo(song.meta.capo);
-  if (song.meta.capo)
-    toolbar.createSpan({
-      cls: capoBad ? "ls-meta ls-warn" : "ls-meta",
-      text: capoBad ? `⚠ Capo ${song.meta.capo}→${capo}` : `Capo ${capo}`,
-      attr: capoBad ? { "aria-label": `Invalid capo ${song.meta.capo}; clamped to ${capo}` } : {},
-    });
-  if (song.meta.tempo) toolbar.createSpan({ cls: "ls-meta", text: `♩=${song.meta.tempo}` });
-  if (song.meta.time) toolbar.createSpan({ cls: "ls-meta", text: song.meta.time });
+  if (song.meta.capo) {
+    const chip = metaChip(toolbar, "guitar", capoBad ? `${song.meta.capo}→${capo}` : `Capo ${capo}`,
+      capoBad ? `Invalid capo ${song.meta.capo}; clamped to ${capo}` : `Capo ${capo}`);
+    if (capoBad) chip.addClass("ls-warn");
+  }
+  if (song.meta.tempo) metaChip(toolbar, "gauge", `${song.meta.tempo} BPM`, "Tempo");
+  if (song.meta.time) metaChip(toolbar, "music-4", song.meta.time, "Time signature");
+  const durationSec = Number(song.meta.duration) || 0;
+  if (durationSec > 0) metaChip(toolbar, "timer", formatDuration(durationSec), "Duration");
 
   // --- transpose controls ---
   const getOffset = () => plugin.settings.offsets[sourcePath] ?? 0;
@@ -197,22 +214,24 @@ function renderLeadsheet(
   const slower = sc.createEl("button", { text: "▾", attr: { "aria-label": "Scroll slower" } });
   const play = sc.createEl("button", { attr: { "aria-label": "Toggle autoscroll" } });
   const faster = sc.createEl("button", { text: "▴", attr: { "aria-label": "Scroll faster" } });
+  const speedOut = sc.createSpan({ cls: "ls-speed", attr: { "aria-label": "Scroll speed (px/s)" } });
   const updatePlay = () => (play.textContent = plugin.isScrolling() ? "⏸" : "▶");
+  const updateSpeed = () => (speedOut.textContent = `${plugin.currentSpeed()}`);
   updatePlay();
+  updateSpeed();
   play.onclick = () => {
     const scrollEl = el.closest(".markdown-preview-view, .cm-scroller") as HTMLElement | null;
     if (scrollEl) plugin.toggleAutoscroll(scrollEl, Number(song.meta.duration) || 0);
     updatePlay();
+    updateSpeed();
   };
-  slower.onclick = async () => {
-    plugin.settings.scrollSpeed = Math.max(5, plugin.settings.scrollSpeed - 5);
-    await plugin.saveSettings();
-  };
-  faster.onclick = async () => {
-    plugin.settings.scrollSpeed += 5;
-    await plugin.saveSettings();
-  };
-  plugin.registerDomEvent(document.body, "leadsheet-scroll-stopped" as any, updatePlay);
+  slower.onclick = () => plugin.adjustSpeed(-5);
+  faster.onclick = () => plugin.adjustSpeed(5);
+  plugin.registerDomEvent(document.body, "leadsheet-scroll-stopped" as any, () => {
+    updatePlay();
+    updateSpeed();
+  });
+  plugin.registerDomEvent(document.body, "leadsheet-speed-changed" as any, updateSpeed);
 
   // --- font-size controls (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
@@ -242,7 +261,8 @@ function renderLeadsheet(
     const shapeShift = plugin.settings.chordMode === "shapes" ? -capo : 0;
     const displayOffset = offset + shapeShift;
     const { key, useFlats } = transposeKey(song.meta.key, displayOffset);
-    keyLabel.textContent = key ? `Key ${key}` : "";
+    keyChip.style.display = key ? "" : "none";
+    keyText.textContent = key ? `Key ${key}` : "";
     reset.textContent = offset > 0 ? `+${offset}` : `${offset}`;
     reset.toggleClass("ls-active", offset !== 0);
     body.empty();
@@ -283,6 +303,22 @@ function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, so
   };
   nav.createEl("button", { text: "◀ Prev" }).onclick = () => go(prevIndex(cur, anchors.length));
   nav.createEl("button", { text: "Next ▶" }).onclick = () => go(nextIndex(cur, anchors.length));
+}
+
+// A metadata chip: a Lucide icon + value, e.g. ♪ Key C. `label` sets aria-label
+// for screen readers (the icon alone conveys nothing). Unknown icon ids render
+// blank, so the text stays legible regardless of the Obsidian version's icon set.
+function metaChip(parent: HTMLElement, icon: string, text: string, label: string): HTMLElement {
+  const chip = parent.createSpan({ cls: "ls-meta ls-chip", attr: { "aria-label": label } });
+  setIcon(chip.createSpan({ cls: "ls-chip-icon" }), icon);
+  chip.createSpan({ cls: "ls-chip-text", text });
+  return chip;
+}
+
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlats: boolean) {

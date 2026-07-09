@@ -40,10 +40,60 @@
   font-weight: 700;
 }
 
+/* Section headers, music-chart styling: a note glyph, small-caps tracking,
+   and a staff-line rule trailing off to the right. */
 .leadsheet .ls-section {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--text-accent);
-  margin: 0.9em 0 0.25em;
+  margin: 1.1em 0 0.4em;
+}
+.leadsheet .ls-section::before {
+  content: "\266A"; /* ♪ */
+  font-size: 1.15em;
+  line-height: 1;
+  transform: translateY(-0.05em);
+}
+.leadsheet .ls-section::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--background-modifier-border);
+}
+body.leadsheet-align-center .leadsheet .ls-section {
+  justify-content: center;
+}
+body.leadsheet-align-center .leadsheet .ls-section::after {
+  display: none;
+}
+
+/* Metadata icon chips (Key / Capo / Tempo / Time / Duration). */
+.leadsheet .ls-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32em;
+}
+.leadsheet .ls-chip-icon {
+  display: inline-flex;
+}
+.leadsheet .ls-chip-icon svg {
+  width: 0.95em;
+  height: 0.95em;
+  color: var(--text-accent);
+}
+
+/* Live scroll-speed readout between ▾ / ▴. */
+.leadsheet .ls-speed {
+  align-self: center;
+  min-width: 2.4em;
+  padding: 0 0.3em;
+  text-align: center;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .leadsheet .ls-gap {
