@@ -1,0 +1,129 @@
+.leadsheet .ls-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  flex-wrap: wrap;
+  padding-bottom: 0.4em;
+  margin-bottom: 0.6em;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.leadsheet .ls-titlebox {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+}
+
+.leadsheet .ls-title {
+  font-weight: 700;
+  font-size: 1.1em;
+}
+
+.leadsheet .ls-meta {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
+.leadsheet .ls-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.leadsheet .ls-controls button {
+  padding: 2px 8px;
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.leadsheet .ls-controls button.ls-active {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+.leadsheet .ls-section {
+  font-weight: 700;
+  color: var(--text-accent);
+  margin: 0.9em 0 0.25em;
+}
+
+.leadsheet .ls-gap {
+  height: 0.8em;
+}
+
+.leadsheet .ls-line {
+  margin: 0.1em 0;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+.leadsheet .ls-seg {
+  display: inline-block;
+  vertical-align: bottom;
+  white-space: pre;
+}
+
+.leadsheet .ls-chord {
+  display: block;
+  min-height: 1.3em;
+  font-weight: 600;
+  font-size: 0.85em;
+  color: var(--text-accent);
+  padding-right: 0.35em;
+}
+
+.leadsheet .ls-barline {
+  color: var(--text-faint);
+}
+
+.leadsheet .ls-barline .ls-chord {
+  display: inline;
+  min-height: 0;
+  padding-right: 0;
+}
+
+.leadsheet .ls-lyric {
+  display: block;
+}
+
+/* Font scale — driven by --ls-font-scale on <body> (default 1). */
+.leadsheet .ls-body {
+  font-size: calc(1em * var(--ls-font-scale, 1));
+}
+
+/* Performance mode: hide app chrome for music-stand use. */
+body.leadsheet-perf .workspace-ribbon,
+body.leadsheet-perf .workspace-split.mod-left-split,
+body.leadsheet-perf .workspace-split.mod-right-split,
+body.leadsheet-perf .status-bar,
+body.leadsheet-perf .view-header {
+  display: none !important;
+}
+
+.leadsheet .ls-warn {
+  color: var(--text-error);
+  font-weight: 600;
+}
+.leadsheet .ls-mode {
+  font-size: 0.85em;
+  padding: 2px 8px;
+}
+
+.ls-invalid-chord {
+  text-decoration: underline wavy var(--text-error);
+  text-underline-offset: 3px;
+}
+
+.leadsheet-setlist .ls-setlist-nav {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+  background: var(--background-primary);
+  z-index: 1;
+}
+.leadsheet-setlist .ls-setlist-song {
+  margin: 1.2em 0;
+  padding-top: 0.4em;
+  border-top: 1px solid var(--background-modifier-border);
+}

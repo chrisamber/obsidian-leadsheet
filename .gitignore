@@ -1,0 +1,19 @@
+node_modules/
+# Build artifacts — rebuilt by `npm run build`, never committed (parallel builds conflict otherwise).
+# Root-anchored so test sources under test/*.mjs stay trackable.
+main.js
+/*.mjs
+# Obsidian plugin runtime state
+data.json
+
+# Agent / AI harness — never ship in the plugin
+.claude/
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+FRICTION.md
+.cursor/
+.windsurf/
+reference/
+references/
+docs/superpowers/

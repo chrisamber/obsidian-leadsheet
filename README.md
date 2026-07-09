@@ -1,0 +1,107 @@
+# Leadsheet
+
+OnSong-style leadsheet viewer for Obsidian: ChordPro rendering, per-file
+transpose, capo-aware shapes, and hands-free autoscroll. Chords align
+per-syllable, so it works with CJK lyrics — no monospace tricks.
+
+![Leadsheet rendered in light and dark themes](assets/screenshot.png)
+
+## Features
+
+- **Chord-over-lyric rendering** aligned per-syllable — CJK-safe, no fixed-width fonts.
+- **Transpose** per file, with sharps vs flats following the target key signature.
+- **Capo-aware shapes** — toggle between concert *sounding* pitch and the *shapes* your hands play.
+- **Autoscroll** paced from the song's `duration`, with tap-to-pause, a music-stand **performance mode**, and font sizing.
+- **Set lists** — one continuous, scrollable view over several songs with Prev/Next.
+- **Authoring aids** — paste-convert chords-over-lyrics, `{Chorus: repeat}` shorthand, and live invalid-chord underlining.
+- **CLI** — validate, transpose, export to JSONL, and derive chord-progression frontmatter.
+
+## Usage
+
+Put a song in a `leadsheet` code block, and reading view renders it:
+
+![The ChordPro-style source on the left, its rendered leadsheet on the right](assets/syntax.png)
+
+````
+```leadsheet
+{title: 茉莉花}
+{artist: Traditional}
+{key: C}
+{tempo: 72}
+
+{Verse}
+| [C]  [G/B] | [Am7] [Am7/G] |
+好一朵 [C]美麗的 茉莉[G/B]花
+```
+````
+
+The toolbar gives you:
+
+- **− / +2 / +** — transpose down/reset/up. The offset is remembered per file.
+  The displayed key updates; flats vs sharps follow the target key signature.
+- **▶ / ⏸** — autoscroll the note (also the hotkeyable command *Leadsheet:
+  Toggle autoscroll*). **▾ / ▴** adjust speed (px/s, in settings too). If the
+  song's frontmatter has `duration:` (seconds), ▶ paces the whole sheet over
+  that time. Tap the sheet body to pause.
+- **A− / A+** — grow/shrink the leadsheet font (global). *Leadsheet: Toggle
+  performance mode* hides the app chrome for music-stand use.
+- **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
+  the shapes your hands play. Bad capo values (outside 0–11) are flagged and
+  clamped.
+
+## Set lists
+
+A `setlist` code block renders several songs as one continuous, scrollable view
+with Prev/Next navigation:
+
+````
+```setlist
+- [[Song A]]
+- [[Song B]]
+```
+````
+
+## Authoring
+
+- *Leadsheet: Convert selection: chords-over-lyrics → inline* rewrites a pasted
+  Ultimate-Guitar-style block (chords on their own line above the lyric) into
+  inline `[C]` chords.
+- `{Chorus: repeat}` re-emits an earlier section instead of pasting it again.
+- Invalid chord tokens are wavy-underlined in the editor.
+
+See [SPEC.md](SPEC.md) for the full schema.
+
+## Install
+
+Not yet in the community plugin store. Manual install:
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from a
+   [release](../../releases).
+2. Copy them into `<vault>/.obsidian/plugins/leadsheet/`.
+3. Enable **Leadsheet** under Settings → Community plugins.
+
+## CLI
+
+```sh
+node cli.mjs validate "My Song.md"        # report unrecognized chord tokens
+node cli.mjs transpose +2 "My Song.md"    # rewrite chords + {key:} in place
+node cli.mjs export "My Song.md"          # dump song(s) as JSONL (frontmatter + sections)
+node cli.mjs annotate "My Song.md"        # write chords_used + roman progression to frontmatter
+```
+
+## Development
+
+```sh
+npm install
+npm test        # esbuild + tsc + node --test
+```
+
+`npm run build` emits `main.js` (the plugin) and per-module `.mjs` bundles used
+by the CLI and tests.
+
+## License
+
+[MIT](LICENSE) — © 2026 chrisamber.
+
+The example song *茉莉花 (Jasmine Flower)* is a traditional folk song in the
+public domain.

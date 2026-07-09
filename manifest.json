@@ -1,0 +1,9 @@
+{
+  "id": "leadsheet",
+  "name": "Leadsheet",
+  "version": "0.1.0",
+  "minAppVersion": "1.0.0",
+  "description": "OnSong-style leadsheet viewer: ChordPro rendering, transpose, autoscroll.",
+  "author": "chrisamber",
+  "isDesktopOnly": false
+}
