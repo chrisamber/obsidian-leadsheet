@@ -90,6 +90,12 @@
   font-size: calc(1em * var(--ls-font-scale, 1));
 }
 
+/* Alignment — driven by body.leadsheet-align-center (default left). */
+body.leadsheet-align-center .leadsheet .ls-body,
+body.leadsheet-align-center .leadsheet .ls-section {
+  text-align: center;
+}
+
 /* Performance mode: hide app chrome for music-stand use. */
 body.leadsheet-perf .workspace-ribbon,
 body.leadsheet-perf .workspace-split.mod-left-split,

@@ -11,6 +11,7 @@ interface LeadsheetSettings {
   offsets: Record<string, number>; // per-file transpose offset
   fontScale: number; // global leadsheet font multiplier
   chordMode: "sounding" | "shapes";
+  align: "left" | "center"; // global sheet alignment
 }
 
 const DEFAULT_SETTINGS: LeadsheetSettings = {
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: LeadsheetSettings = {
   offsets: {},
   fontScale: 1,
   chordMode: "sounding",
+  align: "left",
 };
 
 export default class LeadsheetPlugin extends Plugin {
@@ -28,6 +30,7 @@ export default class LeadsheetPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     document.body.style.setProperty("--ls-font-scale", String(this.settings.fontScale));
+    document.body.classList.toggle("leadsheet-align-center", this.settings.align === "center");
 
     this.registerMarkdownCodeBlockProcessor("leadsheet", (src, el, ctx) => {
       renderLeadsheet(this, src, el, ctx.sourcePath);
@@ -70,7 +73,7 @@ export default class LeadsheetPlugin extends Plugin {
 
   onunload() {
     this.stopAutoscroll();
-    document.body.classList.remove("leadsheet-perf");
+    document.body.classList.remove("leadsheet-perf", "leadsheet-align-center");
   }
 
   isScrolling(): boolean {
@@ -223,6 +226,17 @@ function renderLeadsheet(
   fz.createEl("button", { text: "A+", attr: { "aria-label": "Font larger" } }).onclick = () =>
     setFont(plugin.settings.fontScale + 0.1);
 
+  // --- alignment toggle (global; drives body.leadsheet-align-center) ---
+  const alignBtn = toolbar.createEl("button", { cls: "ls-mode", attr: { "aria-label": "Toggle alignment" } });
+  const syncAlign = () => (alignBtn.textContent = plugin.settings.align === "center" ? "Center" : "Left");
+  syncAlign();
+  alignBtn.onclick = async () => {
+    plugin.settings.align = plugin.settings.align === "center" ? "left" : "center";
+    document.body.classList.toggle("leadsheet-align-center", plugin.settings.align === "center");
+    await plugin.saveSettings();
+    syncAlign();
+  };
+
   function redraw() {
     const offset = getOffset();
     const shapeShift = plugin.settings.chordMode === "shapes" ? -capo : 0;
@@ -373,6 +387,35 @@ class LeadsheetSettingTab extends PluginSettingTab {
           .setDynamicTooltip()
           .onChange(async (v) => {
             this.plugin.settings.scrollSpeed = v;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(this.containerEl)
+      .setName("Font size")
+      .setDesc("Leadsheet text scale (also the A− / A+ toolbar buttons)")
+      .addSlider((s) =>
+        s
+          .setLimits(0.6, 3, 0.1)
+          .setValue(this.plugin.settings.fontScale)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.fontScale = v;
+            document.body.style.setProperty("--ls-font-scale", String(v));
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(this.containerEl)
+      .setName("Alignment")
+      .setDesc("How the sheet is aligned in the pane")
+      .addDropdown((d) =>
+        d
+          .addOptions({ left: "Left", center: "Center" })
+          .setValue(this.plugin.settings.align)
+          .onChange(async (v) => {
+            this.plugin.settings.align = v as "left" | "center";
+            document.body.classList.toggle("leadsheet-align-center", v === "center");
             await this.plugin.saveSettings();
           })
       );
