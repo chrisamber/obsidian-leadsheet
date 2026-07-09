@@ -1,5 +1,7 @@
 # Leadsheet
 
+[![CI](https://github.com/chrisamber/obsidian-leadsheet/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisamber/obsidian-leadsheet/actions/workflows/ci.yml)
+
 OnSong-style leadsheet viewer for Obsidian: ChordPro rendering, per-file
 transpose, capo-aware shapes, and hands-free autoscroll. Chords align
 per-syllable, so it works with CJK lyrics — no monospace tricks.
