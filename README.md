@@ -16,6 +16,8 @@ per-syllable, so it works with CJK lyrics — no monospace tricks.
   signature.
 - **Capo-aware shapes** — toggle between concert *sounding* pitch and the
   *shapes* your hands play.
+- **Chord diagrams** — toggle a strip of guitar fretboard fingerings for every
+  chord in the song, following transpose and capo mode.
 - **Autoscroll** paced from the song's `duration`, with tap-to-pause, a
   music-stand **performance mode**, and font sizing.
 - **Set lists** — one continuous, scrollable view over several songs with
@@ -57,6 +59,10 @@ The toolbar gives you:
 - **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
   the shapes your hands play. Bad capo values (outside 0–11) are flagged and
   clamped.
+- **▦** — show/hide guitar chord diagrams for every chord used in the song
+  (standard tuning). Diagrams follow the current transpose offset and the
+  Sounding/Shapes capo mode, so in Shapes mode they show the grips you
+  actually play. Unrecognized chords (e.g. `N.C.`) are skipped.
 
 ## Set lists
 
@@ -76,6 +82,7 @@ with Prev/Next navigation:
   Ultimate-Guitar-style block (chords on their own line above the lyric) into
   inline `[C]` chords.
 - `{Chorus: repeat}` re-emits an earlier section instead of pasting it again.
+  Multi-word names work too: `{Chorus 2: repeat}`.
 - Invalid chord tokens are wavy-underlined in the editor.
 
 See [SPEC.md](SPEC.md) for the full schema.

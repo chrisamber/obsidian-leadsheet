@@ -52,6 +52,26 @@ test("isValidChord", () => {
   assert.ok(!isValidChord("H7"));
 });
 
+test("{Section: repeat} works with multi-word section names", () => {
+  const song = parse(
+    "{key: C}\n{Chorus 2}\ncho [F]line\n{Verse}\nverse [C]line\n{Chorus 2: repeat}\n"
+  );
+  const n = song.lines.length;
+  assert.deepEqual(song.lines[n - 2], { type: "section", name: "Chorus 2" });
+  assert.deepEqual(
+    song.lines[n - 1].segments.map((s) => s.chord),
+    [null, "F"]
+  );
+  assert.equal(song.meta["chorus 2"], undefined);
+  // ordinary directives still land in metadata
+  assert.equal(song.meta.key, "C");
+});
+
+test("repeat of an unknown section emits just the header", () => {
+  const song = parse("{Bridge 1: repeat}\n");
+  assert.deepEqual(song.lines, [{ type: "section", name: "Bridge 1" }]);
+});
+
 test("{Section: repeat} expands the earlier section inline", () => {
   const song = parse(
     "{Chorus}\ncho [F]line\n{Verse}\nverse [C]line\n{Chorus: repeat}\n"

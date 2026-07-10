@@ -5,6 +5,7 @@ import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { chordsOverLyricsToInline } from "./convert";
 import { parseSetlist, nextIndex, prevIndex } from "./setlist";
+import { ChordShape, shapeForChord, uniqueChords } from "./diagrams";
 
 interface LeadsheetSettings {
   scrollSpeed: number; // px per second (manual fallback)
@@ -12,6 +13,7 @@ interface LeadsheetSettings {
   fontScale: number; // global leadsheet font multiplier
   chordMode: "sounding" | "shapes";
   align: "left" | "center"; // global sheet alignment
+  showDiagrams: boolean;
 }
 
 const DEFAULT_SETTINGS: LeadsheetSettings = {
@@ -20,6 +22,7 @@ const DEFAULT_SETTINGS: LeadsheetSettings = {
   fontScale: 1,
   chordMode: "sounding",
   align: "left",
+  showDiagrams: false,
 };
 
 export default class LeadsheetPlugin extends Plugin {
@@ -154,7 +157,9 @@ function renderLeadsheet(
   el.addClass("leadsheet");
 
   const toolbar = el.createDiv({ cls: "ls-toolbar" });
+  const diagrams = el.createDiv({ cls: "ls-diagrams" });
   const body = el.createDiv({ cls: "ls-body" });
+  const chordList = uniqueChords(song);
   // ponytail: pause only — resume is the ▶ button. A tap that also had to distinguish select/scroll intent is more than a stage needs.
   body.addEventListener("click", () => {
     if (plugin.isScrolling()) plugin.stopAutoscroll();
@@ -208,6 +213,21 @@ function renderLeadsheet(
       redraw();
     };
   }
+
+  // --- chord diagram toggle ---
+  const diaBtn = toolbar.createEl("button", {
+    text: "▦",
+    cls: "ls-mode",
+    attr: { "aria-label": "Toggle chord diagrams" },
+  });
+  const syncDia = () => diaBtn.toggleClass("ls-active", plugin.settings.showDiagrams);
+  syncDia();
+  diaBtn.onclick = async () => {
+    plugin.settings.showDiagrams = !plugin.settings.showDiagrams;
+    await plugin.saveSettings();
+    syncDia();
+    redraw();
+  };
 
   // --- autoscroll controls ---
   const sc = toolbar.createDiv({ cls: "ls-controls" });
@@ -265,6 +285,19 @@ function renderLeadsheet(
     keyText.textContent = key ? `Key ${key}` : "";
     reset.textContent = offset > 0 ? `+${offset}` : `${offset}`;
     reset.toggleClass("ls-active", offset !== 0);
+    // Diagram strip shows the grips as displayed — Shapes mode with a capo
+    // gives the shapes your hands actually play.
+    diagrams.empty();
+    if (plugin.settings.showDiagrams) {
+      const seen = new Set<string>();
+      for (const raw of chordList) {
+        const name = transposeChord(raw, displayOffset, useFlats);
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const shape = shapeForChord(name);
+        if (shape) diagrams.appendChild(renderChordDiagram(name, shape));
+      }
+    }
     body.empty();
     for (const line of song.lines) renderLine(body, line, displayOffset, useFlats);
   }
@@ -355,6 +388,62 @@ function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlat
     });
     span.createSpan({ cls: "ls-lyric", text: seg.text || " " });
   }
+}
+
+// --- chord diagrams (SVG lives here with the rest of the DOM code; the shape
+// lookup in diagrams.ts stays pure for node tests) ---
+// ponytail: split into a diagramview.ts if diagrams grow lefty flip or alternate tunings.
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svg<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | number>,
+  parent: SVGElement | null
+): SVGElementTagNameMap[K] {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  parent?.appendChild(node);
+  return node;
+}
+
+function renderChordDiagram(name: string, shape: ChordShape): SVGSVGElement {
+  const X = (s: number) => 8 + 8 * s; // string index -> x
+  const TOP = 18, ROW = 11, BOTTOM = TOP + 4 * ROW;
+  const rowY = (fret: number) => TOP + (fret - shape.baseFret + 0.5) * ROW;
+  const stroke = { stroke: "currentColor", "stroke-width": 0.75 };
+
+  const root = svg(
+    "svg",
+    { viewBox: "0 0 60 70", class: "ls-diagram", role: "img", "aria-label": `${name} chord diagram` },
+    null
+  );
+  svg("text", { x: X(2.5), y: 8, "text-anchor": "middle", "font-size": 8, class: "ls-diagram-name", fill: "currentColor" }, root).textContent = name;
+
+  for (let i = 0; i <= 4; i++)
+    svg("line", { x1: X(0), x2: X(5), y1: TOP + i * ROW, y2: TOP + i * ROW, ...stroke }, root);
+  for (let s = 0; s < 6; s++)
+    svg("line", { x1: X(s), x2: X(s), y1: TOP, y2: BOTTOM, ...stroke }, root);
+
+  if (shape.baseFret === 1)
+    svg("rect", { x: X(0) - 0.4, y: TOP - 1.5, width: X(5) - X(0) + 0.8, height: 2, fill: "currentColor" }, root);
+  else
+    svg("text", { x: X(5) + 2, y: TOP + 4.5, "font-size": 5, fill: "currentColor" }, root).textContent = `${shape.baseFret}fr`;
+
+  shape.frets.forEach((f, s) => {
+    if (f === -1)
+      svg("text", { x: X(s), y: 15, "text-anchor": "middle", "font-size": 6, fill: "currentColor" }, root).textContent = "×";
+    else if (f === 0) svg("circle", { cx: X(s), cy: 13.5, r: 1.7, fill: "none", ...stroke }, root);
+  });
+
+  const b = shape.barre;
+  if (b)
+    svg("rect", { x: X(b.from) - 2.8, y: rowY(b.fret) - 2, width: X(b.to) - X(b.from) + 5.6, height: 4, rx: 2, fill: "currentColor" }, root);
+  shape.frets.forEach((f, s) => {
+    if (f <= 0 || (b && f === b.fret && s >= b.from && s <= b.to)) return;
+    svg("circle", { cx: X(s), cy: rowY(f), r: 2.6, fill: "currentColor" }, root);
+  });
+  return root;
 }
 
 const INVALID_MARK = Decoration.mark({ class: "ls-invalid-chord" });
