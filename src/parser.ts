@@ -15,10 +15,11 @@ export interface Song {
 
 const DIRECTIVE = /^\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*?)\s*\}\s*$/;
 const SECTION = /^\{\s*([^:{}]+?)\s*\}\s*$/;
+const REPEAT = /^\{\s*([^:{}]+?)\s*:\s*repeat\s*\}\s*$/i;
 const CHORD_TOKEN = /\[([^\]]+)\]/g;
 export const CHORD_RE = /^([A-G](?:#|b)?)([^/]*)(?:\/([A-G](?:#|b)?))?$/;
 
-// ponytail: repeat matches single-token section names (DIRECTIVE's identifier rule) — {Chorus: repeat}, {Bridge: repeat}. Multi-word "{Chorus 2: repeat}" isn't matched; note in SPEC. Good enough for the common case.
+// ponytail: {Name: repeat} re-emits a section verbatim, any section name. Counts ("{Chorus: repeat x3}") stay unsupported until a song actually needs them.
 export function parse(source: string): Song {
   const meta: Record<string, string> = {};
   const lines: SongLine[] = [];
@@ -31,16 +32,17 @@ export function parse(source: string): Song {
       if (active) sections[active].push({ type: "empty" });
       continue;
     }
-    let m = line.match(DIRECTIVE);
+    // {Name: repeat} -> expand the earlier section `Name` inline.
+    let m = line.match(REPEAT);
     if (m) {
-      // {Name: repeat} -> expand the earlier section `Name` inline.
-      if (m[2].trim().toLowerCase() === "repeat") {
-        lines.push({ type: "section", name: m[1] });
-        const body = sections[m[1].toLowerCase()];
-        if (body) for (const l of body) lines.push(l);
-        active = null; // a repeated body is not itself re-recorded
-        continue;
-      }
+      lines.push({ type: "section", name: m[1] });
+      const body = sections[m[1].toLowerCase()];
+      if (body) for (const l of body) lines.push(l);
+      active = null; // a repeated body is not itself re-recorded
+      continue;
+    }
+    m = line.match(DIRECTIVE);
+    if (m) {
       meta[m[1].toLowerCase()] = m[2];
       continue;
     }
@@ -76,7 +78,7 @@ function parseSegments(line: string): Segment[] {
 
 const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-const NOTE_INDEX: Record<string, number> = {};
+export const NOTE_INDEX: Record<string, number> = {};
 NOTES_SHARP.forEach((n, i) => (NOTE_INDEX[n] = i));
 NOTES_FLAT.forEach((n, i) => (NOTE_INDEX[n] = i));
 

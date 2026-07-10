@@ -3,6 +3,8 @@ node_modules/
 # Root-anchored so test sources under test/*.mjs stay trackable.
 main.js
 /*.mjs
+# …except the npm-version helper, which is a source file at the root
+!/version-bump.mjs
 # Obsidian plugin runtime state
 data.json
 

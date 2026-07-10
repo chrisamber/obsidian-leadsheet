@@ -99,6 +99,25 @@ body.leadsheet-perf .view-header {
   display: none !important;
 }
 
+.leadsheet .ls-diagrams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3em 0.7em;
+  margin-bottom: 0.6em;
+}
+.leadsheet .ls-diagrams:empty {
+  display: none;
+}
+.leadsheet .ls-diagram {
+  width: 60px;
+  height: 70px;
+  color: var(--text-muted);
+}
+.leadsheet .ls-diagram .ls-diagram-name {
+  fill: var(--text-accent);
+  font-weight: 600;
+}
+
 .leadsheet .ls-warn {
   color: var(--text-error);
   font-weight: 600;
