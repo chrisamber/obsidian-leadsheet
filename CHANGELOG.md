@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — 2026-07-10
+## 0.3.0 — 2026-07-10
 
 ### Added
 
@@ -19,6 +19,10 @@
 
 - CLI usage message now lists all four subcommands (`export` and `annotate`
   were missing).
+
+## 0.2.0 — 2026-07-10
+
+- Added release plumbing: `versions.json`, CI/release workflows, and plugin metadata.
 
 ## 0.1.0 — 2026-07-09
 
