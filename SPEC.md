@@ -26,8 +26,8 @@ A leadsheet is the content of a ```leadsheet code block:
   `key`, `capo`, `tempo`, `time`. Unknown directives are kept as metadata too.
 - **Sections** `{Anything}` (no colon) — section label, e.g. `{Verse}`, `{Chorus 2}`.
 - **Section repeat** `{Name: repeat}` — re-emits the earlier section `Name`
-  (header + body) so you don't paste a chorus three times. Single-word section
-  names only.
+  (header + body) so you don't paste a chorus three times. Any section name
+  works (`{Chorus 2: repeat}`); names match case-insensitively.
 - **Chords** `[X]` inline before the syllable they land on. Chord grammar:
   `Root(quality)(/Bass)` where Root/Bass ∈ A–G with optional `#`/`b`.
   Anything unparseable renders as-is (e.g. `[N.C.]`).
@@ -77,7 +77,14 @@ Unknown extra fields are allowed and ignored by the plugin.
   above the text. This aligns correctly for CJK lyrics (no monospace tricks).
 - Lines with no chords render as plain lyrics (no empty chord row).
 - Toolbar: title/artist, current key (updates with transpose), capo, tempo,
-  transpose − / reset / +, autoscroll ▶/⏸ and speed − / +.
+  transpose − / reset / +, chord-diagram toggle ▦, autoscroll ▶/⏸ and
+  speed − / +.
+- Chord diagrams: toggling ▦ shows a strip of guitar fingering diagrams
+  (standard tuning) for the song's chords, in order of first appearance,
+  deduped after transpose. Shapes come from a curated open-position dictionary
+  with movable E-/A-shape barre fallbacks (`src/diagrams.ts`); unknown
+  qualities degrade to their family grip (C13 → C7), unrecognized chords are
+  skipped. Diagrams follow the display offset, so Shapes mode shows capo grips.
 
 ## Transpose
 
@@ -104,7 +111,5 @@ Unknown extra fields are allowed and ignored by the plugin.
 
 ## Skipped (add when needed)
 
-- Chord *diagrams* — capo shape re-spelling ships (Sounding/Shapes toggle), but
-  fretboard diagrams do not; add if the user needs fingerings drawn.
 - Whole-file (non-fenced) rendering of existing notes — wrap songs in a
   ```leadsheet block instead; revisit if that's too much friction.

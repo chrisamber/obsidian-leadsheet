@@ -73,6 +73,8 @@ if (cmd === "validate") {
 }
 
 function usage(): never {
-  console.log("usage: node cli.mjs validate <file...> | node cli.mjs transpose <±n> <file...>");
+  console.log(
+    "usage: node cli.mjs validate <file...> | transpose <±n> <file...> | export <file...> | annotate <file...>"
+  );
   process.exit(2);
 }
