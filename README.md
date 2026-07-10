@@ -10,13 +10,20 @@ per-syllable, so it works with CJK lyrics — no monospace tricks.
 
 ## Features
 
-- **Chord-over-lyric rendering** aligned per-syllable — CJK-safe, no fixed-width fonts.
-- **Transpose** per file, with sharps vs flats following the target key signature.
-- **Capo-aware shapes** — toggle between concert *sounding* pitch and the *shapes* your hands play.
-- **Autoscroll** paced from the song's `duration`, with tap-to-pause, a music-stand **performance mode**, and font sizing.
-- **Set lists** — one continuous, scrollable view over several songs with Prev/Next.
-- **Authoring aids** — paste-convert chords-over-lyrics, `{Chorus: repeat}` shorthand, and live invalid-chord underlining.
-- **CLI** — validate, transpose, export to JSONL, and derive chord-progression frontmatter.
+- **Chord-over-lyric rendering** aligned per-syllable — CJK-safe, no
+  fixed-width fonts.
+- **Transpose** per file, with sharps vs flats following the target key
+  signature.
+- **Capo-aware shapes** — toggle between concert *sounding* pitch and the
+  *shapes* your hands play.
+- **Autoscroll** paced from the song's `duration`, with tap-to-pause, a
+  music-stand **performance mode**, and font sizing.
+- **Set lists** — one continuous, scrollable view over several songs with
+  Prev/Next.
+- **Authoring aids** — paste-convert chords-over-lyrics, `{Chorus: repeat}`
+  shorthand, and live invalid-chord underlining.
+- **CLI** — validate, transpose, export to JSONL, and derive
+  chord-progression frontmatter.
 
 ## Usage
 
@@ -24,7 +31,7 @@ Put a song in a `leadsheet` code block, and reading view renders it:
 
 ![The ChordPro-style source on the left, its rendered leadsheet on the right](assets/syntax.png)
 
-````
+````markdown
 ```leadsheet
 {title: 茉莉花}
 {artist: Traditional}
@@ -56,7 +63,7 @@ The toolbar gives you:
 A `setlist` code block renders several songs as one continuous, scrollable view
 with Prev/Next navigation:
 
-````
+````markdown
 ```setlist
 - [[Song A]]
 - [[Song B]]
@@ -85,10 +92,14 @@ Not yet in the community plugin store. Manual install:
 ## CLI
 
 ```sh
-node cli.mjs validate "My Song.md"        # report unrecognized chord tokens
-node cli.mjs transpose +2 "My Song.md"    # rewrite chords + {key:} in place
-node cli.mjs export "My Song.md"          # dump song(s) as JSONL (frontmatter + sections)
-node cli.mjs annotate "My Song.md"        # write chords_used + roman progression to frontmatter
+# report unrecognized chord tokens
+node cli.mjs validate "My Song.md"
+# rewrite chords + {key:} in place
+node cli.mjs transpose +2 "My Song.md"
+# dump song(s) as JSONL (frontmatter + sections)
+node cli.mjs export "My Song.md"
+# write chords_used + roman progression to frontmatter
+node cli.mjs annotate "My Song.md"
 ```
 
 ## Development
