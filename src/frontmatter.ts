@@ -42,4 +42,6 @@ export function updateFrontmatter(text: string, updates: Record<string, unknown>
   // raw === null → no prior frontmatter; `body` is the whole file, prepend a block.
   return `---\n${yaml}\n---\n${raw === null ? "\n" : ""}${body}`;
 }
-// ponytail: flat-YAML subset only (scalars + one-level "- " lists) — exactly the SPEC schema; no nested maps, anchors, or multiline. Swap for a real YAML dep only if the schema grows.
+
+// The song schema uses flat scalars and one-level lists; nested YAML is outside
+// this parser's scope.

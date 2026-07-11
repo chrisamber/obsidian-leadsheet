@@ -7,6 +7,13 @@ import { chordsOverLyricsToInline } from "./convert";
 import { parseSetlist, nextIndex, prevIndex } from "./setlist";
 import { ChordShape, shapeForChord, uniqueChords } from "./diagrams";
 
+declare global {
+  interface HTMLElementEventMap {
+    "leadsheet-scroll-stopped": CustomEvent<void>;
+    "leadsheet-speed-changed": CustomEvent<void>;
+  }
+}
+
 interface LeadsheetSettings {
   scrollSpeed: number; // px per second (manual fallback)
   offsets: Record<string, number>; // per-file transpose offset
@@ -78,13 +85,14 @@ export default class LeadsheetPlugin extends Plugin {
   onunload() {
     this.stopAutoscroll();
     document.body.classList.remove("leadsheet-perf", "leadsheet-align-center");
+    document.body.style.removeProperty("--ls-font-scale");
   }
 
   isScrolling(): boolean {
     return this.scrollEl !== null;
   }
 
-  // ponytail: duration drives scroll — tempo alone can't set scroll distance without bar counts, and duration "just works per song." No duration set -> manual px/s fallback.
+  // Duration sets the pace when available; otherwise use the saved speed.
   toggleAutoscroll(el: HTMLElement, durationSec = 0) {
     if (this.scrollEl) {
       this.stopAutoscroll();
@@ -160,7 +168,7 @@ function renderLeadsheet(
   const diagrams = el.createDiv({ cls: "ls-diagrams" });
   const body = el.createDiv({ cls: "ls-body" });
   const chordList = uniqueChords(song);
-  // ponytail: pause only — resume is the ▶ button. A tap that also had to distinguish select/scroll intent is more than a stage needs.
+  // Tapping the sheet pauses; the toolbar resumes playback.
   body.addEventListener("click", () => {
     if (plugin.isScrolling()) plugin.stopAutoscroll();
   });
@@ -247,11 +255,11 @@ function renderLeadsheet(
   };
   slower.onclick = () => plugin.adjustSpeed(-5);
   faster.onclick = () => plugin.adjustSpeed(5);
-  plugin.registerDomEvent(document.body, "leadsheet-scroll-stopped" as any, () => {
+  plugin.registerDomEvent(document.body, "leadsheet-scroll-stopped", () => {
     updatePlay();
     updateSpeed();
   });
-  plugin.registerDomEvent(document.body, "leadsheet-speed-changed" as any, updateSpeed);
+  plugin.registerDomEvent(document.body, "leadsheet-speed-changed", updateSpeed);
 
   // --- font-size controls (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
@@ -281,7 +289,7 @@ function renderLeadsheet(
     const shapeShift = plugin.settings.chordMode === "shapes" ? -capo : 0;
     const displayOffset = offset + shapeShift;
     const { key, useFlats } = transposeKey(song.meta.key, displayOffset);
-    keyChip.style.display = key ? "" : "none";
+    keyChip.toggleAttribute("hidden", !key);
     keyText.textContent = key ? `Key ${key}` : "";
     reset.textContent = offset > 0 ? `+${offset}` : `${offset}`;
     reset.toggleClass("ls-active", offset !== 0);
@@ -306,7 +314,6 @@ function renderLeadsheet(
 
 const SONG_BLOCK_RE = /```leadsheet\r?\n([\s\S]*?)```/;
 
-// ponytail: cachedRead + reuse renderLeadsheet per song — no new render path. Nav is Prev/Next buttons on the block; add hotkey commands only if gigging needs foot-pedal keys.
 function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, sourcePath: string) {
   el.addClass("leadsheet-setlist");
   const targets = parseSetlist(src);
@@ -323,7 +330,7 @@ function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, so
       return;
     }
     songEl.createDiv({ cls: "ls-section", text: name });
-    plugin.app.vault.cachedRead(dest as any).then((text: string) => {
+    plugin.app.vault.cachedRead(dest).then((text: string) => {
       const m = text.match(SONG_BLOCK_RE);
       if (m) renderLeadsheet(plugin, m[1], songEl.createDiv(), dest.path);
       else songEl.createDiv({ cls: "ls-meta", text: "(no leadsheet block)" });
@@ -392,7 +399,6 @@ function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlat
 
 // --- chord diagrams (SVG lives here with the rest of the DOM code; the shape
 // lookup in diagrams.ts stays pure for node tests) ---
-// ponytail: split into a diagramview.ts if diagrams grow lefty flip or alternate tunings.
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -466,7 +472,7 @@ function buildInvalidChordDecos(view: EditorView): DecorationSet {
       CHORD_TOKEN_G.lastIndex = 0;
       while ((m = CHORD_TOKEN_G.exec(line))) {
         if (!isValidChord(m[1])) {
-          const from = offset + (m.index as number);
+          const from = offset + m.index;
           builder.add(from, from + m[0].length, INVALID_MARK);
         }
       }
@@ -476,7 +482,7 @@ function buildInvalidChordDecos(view: EditorView): DecorationSet {
   return builder.finish();
 }
 
-// ponytail: full-document rescan per edit — a song note is short, so O(doc) is free. If someone edits a 10k-line note, switch to viewport-only ranges.
+// Song notes are short enough to rescan after edits or viewport changes.
 function leadsheetLinter(): Extension {
   return ViewPlugin.fromClass(
     class {

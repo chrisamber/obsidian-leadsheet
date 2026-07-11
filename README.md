@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/chrisamber/obsidian-leadsheet/actions/workflows/ci.yml/badge.svg)](https://github.com/chrisamber/obsidian-leadsheet/actions/workflows/ci.yml)
 
-OnSong-style leadsheet viewer for Obsidian: ChordPro rendering, per-file
-transpose, capo-aware shapes, and hands-free autoscroll. Chords align
-per-syllable, so it works with CJK lyrics — no monospace tricks.
+Turn Obsidian notes into performance-ready lead sheets. Render ChordPro with
+per-file transpose, capo-aware shapes, guitar chord diagrams, set lists, and
+hands-free autoscroll. Chords align per-syllable, so CJK lyrics work without
+monospace tricks.
 
 ![Leadsheet rendered in light and dark themes](assets/screenshot.png)
 
@@ -89,12 +90,26 @@ See [SPEC.md](SPEC.md) for the full schema.
 
 ## Install
 
-Not yet in the community plugin store. Manual install:
+### Public beta with BRAT
+
+1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) from Community
+   plugins.
+2. In BRAT settings, select **Add beta plugin**.
+3. Enter `https://github.com/chrisamber/obsidian-leadsheet` and enable
+   **Leadsheet**.
+
+The Community Plugins submission is in progress. Once approved, search for
+**Leadsheet** under Settings → Community plugins.
+
+### Manual install
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from a
-   [release](../../releases).
+   [GitHub release](https://github.com/chrisamber/obsidian-leadsheet/releases).
 2. Copy them into `<vault>/.obsidian/plugins/leadsheet/`.
 3. Enable **Leadsheet** under Settings → Community plugins.
+
+Please report beta feedback and bugs through
+[GitHub Issues](https://github.com/chrisamber/obsidian-leadsheet/issues).
 
 ## CLI
 

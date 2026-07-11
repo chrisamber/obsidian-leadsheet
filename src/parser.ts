@@ -19,7 +19,7 @@ const REPEAT = /^\{\s*([^:{}]+?)\s*:\s*repeat\s*\}\s*$/i;
 const CHORD_TOKEN = /\[([^\]]+)\]/g;
 export const CHORD_RE = /^([A-G](?:#|b)?)([^/]*)(?:\/([A-G](?:#|b)?))?$/;
 
-// ponytail: {Name: repeat} re-emits a section verbatim, any section name. Counts ("{Chorus: repeat x3}") stay unsupported until a song actually needs them.
+// {Name: repeat} re-emits a section once; repeat counts are not supported.
 export function parse(source: string): Song {
   const meta: Record<string, string> = {};
   const lines: SongLine[] = [];
