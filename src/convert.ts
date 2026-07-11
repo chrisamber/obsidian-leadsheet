@@ -20,7 +20,8 @@ function mergeChordLine(chordLine: string, lyric: string): string {
   return result;
 }
 
-// ponytail: heuristic converter — a lyric line that is entirely bare chord letters (rare) can be misread as a chord line. The user reviews the pasted result, so a best-effort pass beats a parser. Ceiling: add a "// force lyric" escape only if it bites.
+// Best-effort conversion: a lyric line made entirely of chord names is treated
+// as a chord line.
 export function chordsOverLyricsToInline(text: string): string {
   const lines = text.split(/\r?\n/);
   const out: string[] = [];

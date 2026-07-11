@@ -24,4 +24,6 @@ export function chordToRoman(chord: string, key: string | undefined): string {
   const ext = quality.replace(/^m(in)?/, ""); // drop the 'm', keep 7 / sus / etc.
   return num + ext;
 }
-// ponytail: major-key diatonic mapping only; ignores mode/minor-key spelling and slash-bass degrees. Enough for "find the IV-V-vi turnaround" text queries. Upgrade to key-aware spelling if minor-key charts need it.
+
+// Roman numerals use major-key degrees; mode spelling and slash-bass degrees
+// are not represented.

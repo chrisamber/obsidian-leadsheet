@@ -83,7 +83,6 @@ function normalizeQuality(q: string): string {
 
 // One coarse step down the quality-family ladder; null = give up. Never falls
 // back to a bare major triad for an unrecognized quality.
-// ponytail: family mapping is deliberately coarse (C13 gets the C7 grip) — add finer shapes per request.
 function degradeQuality(q: string): string | null {
   if (/^maj/.test(q)) return q === "maj7" ? null : "maj7";
   if (/^m(?!aj)/.test(q)) return q === "m" ? null : q === "m7" ? "m" : "m7";

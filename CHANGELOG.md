@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 — 2026-07-11
+
+Public beta and Community Plugins submission release.
+
+### Highlights
+
+- Render ChordPro lead sheets directly in Obsidian, with chord-over-lyric
+  alignment that works for CJK lyrics.
+- Transpose per song, switch between sounding pitch and capo shapes, and show
+  guitar chord diagrams that follow both.
+- Build continuous set lists and use duration-paced autoscroll and performance
+  mode on stage.
+- Validate, transpose, annotate, and export song data from the repository CLI.
+
+### Changed
+
+- Updated installation guidance for BRAT beta testing and Community Plugins.
+- Refined plugin metadata and source for Community Plugins review.
+
+Beta feedback is welcome through
+[GitHub Issues](https://github.com/chrisamber/obsidian-leadsheet/issues).
+
 ## 0.3.0 — 2026-07-10
 
 ### Added

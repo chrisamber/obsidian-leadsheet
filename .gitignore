@@ -7,15 +7,3 @@ main.js
 !/version-bump.mjs
 # Obsidian plugin runtime state
 data.json
-
-# Agent / AI harness — never ship in the plugin
-.claude/
-CLAUDE.md
-AGENTS.md
-GEMINI.md
-FRICTION.md
-.cursor/
-.windsurf/
-reference/
-references/
-docs/superpowers/
