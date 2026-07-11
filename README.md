@@ -90,16 +90,18 @@ See [SPEC.md](SPEC.md) for the full schema.
 
 ## Install
 
-### Public beta with BRAT
+### Community Plugins
+
+1. Open **Settings → Community plugins** in Obsidian and select **Browse**.
+2. Search for **Leadsheet**, then select **Install** and **Enable**.
+
+### Beta updates with BRAT
 
 1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) from Community
    plugins.
 2. In BRAT settings, select **Add beta plugin**.
 3. Enter `https://github.com/chrisamber/obsidian-leadsheet` and enable
    **Leadsheet**.
-
-The Community Plugins submission is in progress. Once approved, search for
-**Leadsheet** under Settings → Community plugins.
 
 ### Manual install
 
