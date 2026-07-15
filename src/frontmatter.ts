@@ -29,8 +29,8 @@ export function parseFrontmatter(
 }
 
 function emit(k: string, v: unknown): string {
-  if (Array.isArray(v)) return `${k}:\n` + v.map((x) => `  - ${x}`).join("\n");
-  return `${k}: ${v}`;
+  if (Array.isArray(v)) return `${k}:\n` + v.map((x) => `  - ${String(x)}`).join("\n");
+  return `${k}: ${String(v)}`;
 }
 
 export function updateFrontmatter(text: string, updates: Record<string, unknown>): string {

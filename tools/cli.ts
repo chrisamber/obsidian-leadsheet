@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { isValidChord, transposeChord, transposeKey, parse } from "./parser";
-import { fileToRecord } from "./songdata";
-import { updateFrontmatter } from "./frontmatter";
-import { chordToRoman } from "./roman";
+import { isValidChord, transposeChord, transposeKey, parse } from "../src/parser";
+import { fileToRecord } from "../src/songdata";
+import { updateFrontmatter } from "../src/frontmatter";
+import { chordToRoman } from "../src/roman";
 
 const BLOCK_RE = /^```leadsheet\n([\s\S]*?)^```/gm;
 const CHORD_TOKEN = /\[([^\]]+)\]/g;
@@ -59,7 +59,8 @@ if (cmd === "validate") {
   for (const file of rest) {
     const text = readFileSync(file, "utf8");
     const rec = fileToRecord(text);
-    const key = rec.frontmatter.key as string | undefined;
+    const value = rec.frontmatter.key;
+    const key = typeof value === "string" ? value : undefined;
     const chords_used = [...new Set(rec.sections.flatMap((s) => s.chords))].sort();
     const progression = rec.sections
       .filter((s) => s.chords.length)

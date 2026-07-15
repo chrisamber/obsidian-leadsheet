@@ -1,5 +1,5 @@
 import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
-import { parse, Song, SongLine, transposeChord, transposeKey, isValidChord } from "./parser";
+import { parse, SongLine, transposeChord, transposeKey, isValidChord } from "./parser";
 import { clampCapo, scrollSpeedForDuration } from "./viewutils";
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
@@ -40,8 +40,8 @@ export default class LeadsheetPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
-    document.body.style.setProperty("--ls-font-scale", String(this.settings.fontScale));
-    document.body.classList.toggle("leadsheet-align-center", this.settings.align === "center");
+    activeDocument.body.style.setProperty("--ls-font-scale", String(this.settings.fontScale));
+    activeDocument.body.classList.toggle("leadsheet-align-center", this.settings.align === "center");
 
     this.registerMarkdownCodeBlockProcessor("leadsheet", (src, el, ctx) => {
       renderLeadsheet(this, src, el, ctx.sourcePath);
@@ -63,7 +63,7 @@ export default class LeadsheetPlugin extends Plugin {
     this.addCommand({
       id: "toggle-performance",
       name: "Toggle performance mode",
-      callback: () => document.body.classList.toggle("leadsheet-perf"),
+      callback: () => activeDocument.body.classList.toggle("leadsheet-perf"),
     });
 
     this.addCommand({
@@ -84,8 +84,8 @@ export default class LeadsheetPlugin extends Plugin {
 
   onunload() {
     this.stopAutoscroll();
-    document.body.classList.remove("leadsheet-perf", "leadsheet-align-center");
-    document.body.style.removeProperty("--ls-font-scale");
+    activeDocument.body.classList.remove("leadsheet-perf", "leadsheet-align-center");
+    activeDocument.body.style.removeProperty("--ls-font-scale");
   }
 
   isScrolling(): boolean {
@@ -99,6 +99,7 @@ export default class LeadsheetPlugin extends Plugin {
       return;
     }
     this.scrollEl = el;
+    const win = el.win;
     const derived = scrollSpeedForDuration(el.scrollHeight - el.clientHeight, durationSec);
     this.liveSpeed = derived > 0 ? derived : this.settings.scrollSpeed;
     let pos = el.scrollTop;
@@ -115,25 +116,28 @@ export default class LeadsheetPlugin extends Plugin {
         }
       }
       lastTs = ts;
-      this.scrollRaf = requestAnimationFrame(step);
+      this.scrollRaf = win.requestAnimationFrame(step);
     };
-    this.scrollRaf = requestAnimationFrame(step);
+    this.scrollRaf = win.requestAnimationFrame(step);
   }
 
   stopAutoscroll() {
-    if (this.scrollRaf) cancelAnimationFrame(this.scrollRaf);
+    const body = this.scrollEl?.doc.body ?? activeDocument.body;
+    if (this.scrollRaf) (this.scrollEl?.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
     this.scrollRaf = 0;
     this.scrollEl = null;
-    document.body.dispatchEvent(new CustomEvent("leadsheet-scroll-stopped"));
+    const win = body.doc.defaultView;
+    if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
   }
 
   // Change speed by delta px/s. Persists the manual fallback and, if a scroll
   // is running, applies live so the sheet speeds up/slows without restarting.
-  adjustSpeed(delta: number) {
+  adjustSpeed(delta: number, body = activeDocument.body) {
     this.settings.scrollSpeed = Math.max(5, this.settings.scrollSpeed + delta);
     if (this.scrollEl) this.liveSpeed = Math.max(5, this.liveSpeed + delta);
-    this.saveSettings();
-    document.body.dispatchEvent(new CustomEvent("leadsheet-speed-changed"));
+    void this.saveSettings();
+    const win = body.doc.defaultView;
+    if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-speed-changed"));
   }
 
   currentSpeed(): number {
@@ -141,7 +145,12 @@ export default class LeadsheetPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded: unknown = await this.loadData();
+    this.settings = Object.assign(
+      {},
+      DEFAULT_SETTINGS,
+      loaded !== null && typeof loaded === "object" ? loaded : {}
+    );
   }
 
   async saveSettings() {
@@ -155,6 +164,9 @@ function renderLeadsheet(
   el: HTMLElement,
   sourcePath: string
 ) {
+  const hostBody = el.doc.body;
+  hostBody.style.setProperty("--ls-font-scale", String(plugin.settings.fontScale));
+  hostBody.classList.toggle("leadsheet-align-center", plugin.settings.align === "center");
   const song = parse(src);
   // Frontmatter is the metadata source of truth; block directives override.
   const fm = plugin.app.metadataCache.getCache(sourcePath)?.frontmatter ?? {};
@@ -248,23 +260,23 @@ function renderLeadsheet(
   updatePlay();
   updateSpeed();
   play.onclick = () => {
-    const scrollEl = el.closest(".markdown-preview-view, .cm-scroller") as HTMLElement | null;
+    const scrollEl = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
     if (scrollEl) plugin.toggleAutoscroll(scrollEl, Number(song.meta.duration) || 0);
     updatePlay();
     updateSpeed();
   };
-  slower.onclick = () => plugin.adjustSpeed(-5);
-  faster.onclick = () => plugin.adjustSpeed(5);
-  plugin.registerDomEvent(document.body, "leadsheet-scroll-stopped", () => {
+  slower.onclick = () => plugin.adjustSpeed(-5, hostBody);
+  faster.onclick = () => plugin.adjustSpeed(5, hostBody);
+  plugin.registerDomEvent(hostBody, "leadsheet-scroll-stopped", () => {
     updatePlay();
     updateSpeed();
   });
-  plugin.registerDomEvent(document.body, "leadsheet-speed-changed", updateSpeed);
+  plugin.registerDomEvent(hostBody, "leadsheet-speed-changed", updateSpeed);
 
   // --- font-size controls (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
     plugin.settings.fontScale = Math.min(3, Math.max(0.6, Math.round(scale * 10) / 10));
-    document.body.style.setProperty("--ls-font-scale", String(plugin.settings.fontScale));
+    hostBody.style.setProperty("--ls-font-scale", String(plugin.settings.fontScale));
     await plugin.saveSettings();
   };
   const fz = toolbar.createDiv({ cls: "ls-controls" });
@@ -279,7 +291,7 @@ function renderLeadsheet(
   syncAlign();
   alignBtn.onclick = async () => {
     plugin.settings.align = plugin.settings.align === "center" ? "left" : "center";
-    document.body.classList.toggle("leadsheet-align-center", plugin.settings.align === "center");
+    hostBody.classList.toggle("leadsheet-align-center", plugin.settings.align === "center");
     await plugin.saveSettings();
     syncAlign();
   };
@@ -303,7 +315,7 @@ function renderLeadsheet(
         if (seen.has(name)) continue;
         seen.add(name);
         const shape = shapeForChord(name);
-        if (shape) diagrams.appendChild(renderChordDiagram(name, shape));
+        if (shape) diagrams.appendChild(renderChordDiagram(name, shape, el.doc));
       }
     }
     body.empty();
@@ -330,11 +342,13 @@ function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, so
       return;
     }
     songEl.createDiv({ cls: "ls-section", text: name });
-    plugin.app.vault.cachedRead(dest).then((text: string) => {
-      const m = text.match(SONG_BLOCK_RE);
-      if (m) renderLeadsheet(plugin, m[1], songEl.createDiv(), dest.path);
-      else songEl.createDiv({ cls: "ls-meta", text: "(no leadsheet block)" });
-    });
+    void plugin.app.vault.cachedRead(dest)
+      .then((text: string) => {
+        const m = text.match(SONG_BLOCK_RE);
+        if (m) renderLeadsheet(plugin, m[1], songEl.createDiv(), dest.path);
+        else songEl.createDiv({ cls: "ls-meta", text: "(no leadsheet block)" });
+      })
+      .catch(() => songEl.createDiv({ cls: "ls-meta ls-warn", text: "(failed to read song)" }));
   });
 
   const go = (i: number) => {
@@ -405,15 +419,16 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 function svg<K extends keyof SVGElementTagNameMap>(
   tag: K,
   attrs: Record<string, string | number>,
-  parent: SVGElement | null
+  parent: SVGElement | null,
+  doc = parent?.doc ?? activeDocument
 ): SVGElementTagNameMap[K] {
-  const node = document.createElementNS(SVG_NS, tag);
+  const node = doc.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
   parent?.appendChild(node);
   return node;
 }
 
-function renderChordDiagram(name: string, shape: ChordShape): SVGSVGElement {
+function renderChordDiagram(name: string, shape: ChordShape, doc: Document): SVGSVGElement {
   const X = (s: number) => 8 + 8 * s; // string index -> x
   const TOP = 18, ROW = 11, BOTTOM = TOP + 4 * ROW;
   const rowY = (fret: number) => TOP + (fret - shape.baseFret + 0.5) * ROW;
@@ -422,7 +437,8 @@ function renderChordDiagram(name: string, shape: ChordShape): SVGSVGElement {
   const root = svg(
     "svg",
     { viewBox: "0 0 60 70", class: "ls-diagram", role: "img", "aria-label": `${name} chord diagram` },
-    null
+    null,
+    doc
   );
   svg("text", { x: X(2.5), y: 8, "text-anchor": "middle", "font-size": 8, class: "ls-diagram-name", fill: "currentColor" }, root).textContent = name;
 
@@ -515,7 +531,6 @@ class LeadsheetSettingTab extends PluginSettingTab {
         s
           .setLimits(5, 120, 5)
           .setValue(this.plugin.settings.scrollSpeed)
-          .setDynamicTooltip()
           .onChange(async (v) => {
             this.plugin.settings.scrollSpeed = v;
             await this.plugin.saveSettings();
@@ -529,10 +544,9 @@ class LeadsheetSettingTab extends PluginSettingTab {
         s
           .setLimits(0.6, 3, 0.1)
           .setValue(this.plugin.settings.fontScale)
-          .setDynamicTooltip()
           .onChange(async (v) => {
             this.plugin.settings.fontScale = v;
-            document.body.style.setProperty("--ls-font-scale", String(v));
+            this.containerEl.doc.body.style.setProperty("--ls-font-scale", String(v));
             await this.plugin.saveSettings();
           })
       );
@@ -546,7 +560,7 @@ class LeadsheetSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.align)
           .onChange(async (v) => {
             this.plugin.settings.align = v as "left" | "center";
-            document.body.classList.toggle("leadsheet-align-center", v === "center");
+            this.containerEl.doc.body.classList.toggle("leadsheet-align-center", v === "center");
             await this.plugin.saveSettings();
           })
       );
