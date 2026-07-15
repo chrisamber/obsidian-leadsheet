@@ -84,7 +84,7 @@ with Prev/Next navigation:
   inline `[C]` chords.
 - `{Chorus: repeat}` re-emits an earlier section instead of pasting it again.
   Multi-word names work too: `{Chorus 2: repeat}`.
-- Invalid chord tokens are wavy-underlined in the editor.
+- Invalid chord tokens are marked in the editor.
 
 See [SPEC.md](SPEC.md) for the full schema.
 

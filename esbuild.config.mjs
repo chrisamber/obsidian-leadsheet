@@ -26,3 +26,12 @@ for (const file of readdirSync("src")) {
     outfile: `${name}.mjs`,
   });
 }
+
+await esbuild.build({
+  entryPoints: ["tools/cli.ts"],
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  target: "es2020",
+  outfile: "cli.mjs",
+});

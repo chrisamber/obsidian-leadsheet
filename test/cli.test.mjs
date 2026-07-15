@@ -35,3 +35,14 @@ test("annotate writes chords_used + progression back to frontmatter", () => {
   assert.equal(data.progression, "Verse: vi IV V");
   assert.equal(data.title, "A"); // untouched
 });
+
+test("annotate ignores a non-string key", () => {
+  const f = join(dir, "numeric-key.md");
+  writeFileSync(
+    f,
+    `---\nkey: 7\n---\n\n\`\`\`leadsheet\n{Verse}\nla [Am]la\n\`\`\`\n`
+  );
+  execFileSync("node", ["cli.mjs", "annotate", f], { encoding: "utf8" });
+  const { data } = parseFrontmatter(readFileSync(f, "utf8"));
+  assert.equal(data.progression, "Verse: Am");
+});

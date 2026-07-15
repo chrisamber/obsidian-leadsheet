@@ -70,7 +70,7 @@ function parseSegments(line: string): Segment[] {
     const text = line.slice(last, m.index);
     if (chord !== null || text) segments.push({ chord, text });
     chord = m[1];
-    last = (m.index as number) + m[0].length;
+    last = m.index + m[0].length;
   }
   segments.push({ chord, text: line.slice(last) });
   return segments;

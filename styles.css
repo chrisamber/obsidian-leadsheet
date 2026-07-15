@@ -147,12 +147,12 @@ body.leadsheet-align-center .leadsheet .ls-section {
 }
 
 /* Performance mode: hide app chrome for music-stand use. */
-body.leadsheet-perf .workspace-ribbon,
-body.leadsheet-perf .workspace-split.mod-left-split,
-body.leadsheet-perf .workspace-split.mod-right-split,
-body.leadsheet-perf .status-bar,
-body.leadsheet-perf .view-header {
-  display: none !important;
+body.leadsheet-perf .app-container .workspace-ribbon,
+body.leadsheet-perf .app-container .workspace-split.mod-left-split,
+body.leadsheet-perf .app-container .workspace-split.mod-right-split,
+body.leadsheet-perf .app-container .status-bar,
+body.leadsheet-perf .app-container .view-header {
+  display: none;
 }
 
 .leadsheet .ls-diagrams {
@@ -184,8 +184,7 @@ body.leadsheet-perf .view-header {
 }
 
 .ls-invalid-chord {
-  text-decoration: underline wavy var(--text-error);
-  text-underline-offset: 3px;
+  border-bottom: 2px dotted var(--text-error);
 }
 
 .leadsheet-setlist .ls-setlist-nav {
