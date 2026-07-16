@@ -7,7 +7,7 @@ per-file transpose, capo-aware shapes, guitar chord diagrams, set lists, and
 hands-free autoscroll. Chords align per-syllable, so CJK lyrics work without
 monospace tricks.
 
-![Leadsheet rendered in light and dark themes](assets/screenshot.png)
+![Leadsheet 0.5 running in Obsidian with a chord diagram popover](assets/screenshot.png)
 
 ## Features
 
@@ -57,6 +57,7 @@ The toolbar gives you:
   that time. Tap the sheet body to pause.
 - **A− / A+** — grow/shrink the leadsheet font (global). *Leadsheet: Toggle
   performance mode* hides the app chrome for music-stand use.
+- **Center / Left** — switch the sheet alignment globally.
 - **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
   the shapes your hands play. Bad capo values (outside 0–11) are flagged and
   clamped.
