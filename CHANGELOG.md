@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 — 2026-07-16
+
+### Added
+
+- Hover, keyboard-focus, or tap any recognized chord to show its guitar
+  fingering without opening the full diagram strip. Popovers follow the active
+  transpose offset and Sounding/Shapes capo mode.
+
+### Changed
+
+- Chord diagram triggers preserve theme styling and expose accessible labels
+  and keyboard focus states.
+- Credited Obsidian Chord Sheets as the inspiration for chord diagram
+  popovers.
+
 ## 0.4.0 — 2026-07-11
 
 Public beta and Community Plugins submission release.

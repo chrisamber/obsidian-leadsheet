@@ -1,4 +1,4 @@
-import { CHORD_RE, NOTE_INDEX, Song } from "./parser";
+import { CHORD_RE, NOTE_INDEX, Song, transposeChord } from "./parser";
 
 // Guitar fingering shapes (standard tuning EADGBE). Pure lookup — the SVG
 // drawing lives with the rest of the DOM code in main.ts.
@@ -127,6 +127,11 @@ export function shapeForChord(chord: string): ChordShape | null {
     quality = degradeQuality(quality);
   }
   return null;
+}
+
+export function chordDiagramData(chord: string, offset: number, useFlats: boolean) {
+  const name = transposeChord(chord, offset, useFlats);
+  return { name, shape: shapeForChord(name) };
 }
 
 // Chords in order of first appearance, deduped (repeat-expanded sections included).

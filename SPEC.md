@@ -92,7 +92,8 @@ Unknown extra fields are allowed and ignored by the plugin.
 - Accidental choice: transpose the declared `{key:}`; if the resulting key is a
   flat key (F/Bb/Eb/Ab/Db/Gb or relative minors) use flats, else sharps.
   No `{key:}` → sharps.
-- Capo is display-only metadata (no automatic shape re-spelling).
+- Capo display mode is user-selectable: Sounding shows concert pitch, while
+  Shapes shifts chord names and diagrams by `-capo` to show the grips played.
 
 ## Autoscroll
 

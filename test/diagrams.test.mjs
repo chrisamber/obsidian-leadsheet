@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { shapeForChord, uniqueChords } from "../diagrams.mjs";
+import { chordDiagramData, shapeForChord, uniqueChords } from "../diagrams.mjs";
 import { parse } from "../parser.mjs";
 
 test("open-position shapes", () => {
@@ -61,6 +61,13 @@ test("unrecognized chords return null, never a guessed major", () => {
   assert.equal(shapeForChord("N.C."), null);
   assert.equal(shapeForChord("H7"), null);
   assert.equal(shapeForChord("Cxyz"), null);
+});
+
+test("diagram presentation follows the displayed transposition", () => {
+  const diagram = chordDiagramData("C", 2, false);
+  assert.equal(diagram.name, "D");
+  assert.deepEqual(diagram.shape, shapeForChord("D"));
+  assert.equal(chordDiagramData("N.C.", 2, false).shape, null);
 });
 
 test("uniqueChords: first-appearance order, deduped, repeats included", () => {

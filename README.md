@@ -17,8 +17,8 @@ monospace tricks.
   signature.
 - **Capo-aware shapes** — toggle between concert *sounding* pitch and the
   *shapes* your hands play.
-- **Chord diagrams** — toggle a strip of guitar fretboard fingerings for every
-  chord in the song, following transpose and capo mode.
+- **Chord diagrams** — hover, focus, or tap a chord for its guitar fingering,
+  or toggle a strip for the whole song. Both follow transpose and capo mode.
 - **Autoscroll** paced from the song's `duration`, with tap-to-pause, a
   music-stand **performance mode**, and font sizing.
 - **Set lists** — one continuous, scrollable view over several songs with
@@ -60,6 +60,8 @@ The toolbar gives you:
 - **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
   the shapes your hands play. Bad capo values (outside 0–11) are flagged and
   clamped.
+- **Chord popovers** — hover, keyboard-focus, or tap a recognized chord to see
+  its current fingering without showing the full diagram strip.
 - **▦** — show/hide guitar chord diagrams for every chord used in the song
   (standard tuning). Diagrams follow the current transpose offset and the
   Sounding/Shapes capo mode, so in Shapes mode they show the grips you
@@ -135,6 +137,12 @@ npm test        # esbuild + tsc + node --test
 
 `npm run build` emits `main.js` (the plugin) and per-module `.mjs` bundles used
 by the CLI and tests.
+
+## Credits
+
+Chord diagram popovers were inspired by
+[Obsidian Chord Sheets](https://github.com/olvidalo/obsidian-chord-sheets) by
+Marcel Schaeben.
 
 ## License
 

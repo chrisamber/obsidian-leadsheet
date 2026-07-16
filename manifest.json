@@ -1,7 +1,7 @@
 {
   "id": "leadsheet",
   "name": "Leadsheet",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minAppVersion": "1.0.0",
   "description": "Render ChordPro lead sheets with transpose, capo shapes, chord diagrams, set lists, and autoscroll.",
   "author": "chrisamber",
