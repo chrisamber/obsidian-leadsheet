@@ -414,8 +414,9 @@ function renderChord(parent: HTMLElement, chord: string, offset: number, useFlat
     return;
   }
 
-  const trigger = parent.createEl("button", {
-    cls: "ls-chord ls-chord-trigger",
+  const chordEl = parent.createSpan({ cls: "ls-chord" });
+  const trigger = chordEl.createEl("button", {
+    cls: "ls-chord-trigger",
     text: name,
     attr: { type: "button", "aria-label": `${name} chord diagram` },
   });
@@ -426,6 +427,11 @@ function renderChord(parent: HTMLElement, chord: string, offset: number, useFlat
     if (!open) trigger.blur();
   });
   trigger.addEventListener("blur", () => trigger.removeClass("ls-popover-open"));
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    trigger.removeClass("ls-popover-open");
+    trigger.blur();
+  });
 }
 
 // --- chord diagrams (SVG lives here with the rest of the DOM code; the shape
