@@ -5,7 +5,7 @@ import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { chordsOverLyricsToInline } from "./convert";
 import { parseSetlist, nextIndex, prevIndex } from "./setlist";
-import { ChordShape, shapeForChord, uniqueChords } from "./diagrams";
+import { ChordShape, chordDiagramData, uniqueChords } from "./diagrams";
 
 declare global {
   interface HTMLElementEventMap {
@@ -311,10 +311,9 @@ function renderLeadsheet(
     if (plugin.settings.showDiagrams) {
       const seen = new Set<string>();
       for (const raw of chordList) {
-        const name = transposeChord(raw, displayOffset, useFlats);
+        const { name, shape } = chordDiagramData(raw, displayOffset, useFlats);
         if (seen.has(name)) continue;
         seen.add(name);
-        const shape = shapeForChord(name);
         if (shape) diagrams.appendChild(renderChordDiagram(name, shape, el.doc));
       }
     }
@@ -395,20 +394,52 @@ function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlat
   if (line.segments.every((s) => /^[\s|.·:]*$/.test(s.text))) {
     div.addClass("ls-barline");
     for (const seg of line.segments) {
-      if (seg.chord)
-        div.createSpan({ cls: "ls-chord", text: transposeChord(seg.chord, offset, useFlats) });
+      if (seg.chord) renderChord(div, seg.chord, offset, useFlats);
       if (seg.text) div.createSpan({ text: seg.text });
     }
     return;
   }
   for (const seg of line.segments) {
     const span = div.createSpan({ cls: "ls-seg" });
-    span.createSpan({
-      cls: "ls-chord",
-      text: seg.chord ? transposeChord(seg.chord, offset, useFlats) : "",
-    });
+    if (seg.chord) renderChord(span, seg.chord, offset, useFlats);
+    else span.createSpan({ cls: "ls-chord" });
     span.createSpan({ cls: "ls-lyric", text: seg.text || " " });
   }
+}
+
+function renderChord(parent: HTMLElement, chord: string, offset: number, useFlats: boolean) {
+  const { name, shape } = chordDiagramData(chord, offset, useFlats);
+  if (!shape) {
+    parent.createSpan({ cls: "ls-chord", text: name });
+    return;
+  }
+
+  const chordEl = parent.createSpan({ cls: "ls-chord" });
+  const trigger = chordEl.createEl("button", {
+    cls: "ls-chord-trigger",
+    text: name,
+    attr: { type: "button", "aria-label": `${name} chord diagram` },
+  });
+  const popover = trigger.createSpan({ cls: "ls-chord-popover", attr: { role: "tooltip" } });
+  popover.appendChild(renderChordDiagram(name, shape, parent.doc));
+  const resetHoverDismissal = () => trigger.removeClass("ls-popover-dismissed");
+  const suppressHoverUntilPointerChange = () => trigger.addClass("ls-popover-dismissed");
+  trigger.addEventListener("pointerenter", resetHoverDismissal);
+  trigger.addEventListener("pointerleave", resetHoverDismissal);
+  trigger.addEventListener("click", () => {
+    const open = trigger.classList.toggle("ls-popover-open");
+    if (!open) {
+      suppressHoverUntilPointerChange();
+      trigger.blur();
+    }
+  });
+  trigger.addEventListener("blur", () => trigger.removeClass("ls-popover-open"));
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    suppressHoverUntilPointerChange();
+    trigger.removeClass("ls-popover-open");
+    trigger.blur();
+  });
 }
 
 // --- chord diagrams (SVG lives here with the rest of the DOM code; the shape
