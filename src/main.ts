@@ -422,13 +422,21 @@ function renderChord(parent: HTMLElement, chord: string, offset: number, useFlat
   });
   const popover = trigger.createSpan({ cls: "ls-chord-popover", attr: { role: "tooltip" } });
   popover.appendChild(renderChordDiagram(name, shape, parent.doc));
+  const resetHoverDismissal = () => trigger.removeClass("ls-popover-dismissed");
+  const suppressHoverUntilPointerChange = () => trigger.addClass("ls-popover-dismissed");
+  trigger.addEventListener("pointerenter", resetHoverDismissal);
+  trigger.addEventListener("pointerleave", resetHoverDismissal);
   trigger.addEventListener("click", () => {
     const open = trigger.classList.toggle("ls-popover-open");
-    if (!open) trigger.blur();
+    if (!open) {
+      suppressHoverUntilPointerChange();
+      trigger.blur();
+    }
   });
   trigger.addEventListener("blur", () => trigger.removeClass("ls-popover-open"));
   trigger.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    suppressHoverUntilPointerChange();
     trigger.removeClass("ls-popover-open");
     trigger.blur();
   });

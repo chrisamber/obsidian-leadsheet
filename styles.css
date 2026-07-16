@@ -166,7 +166,7 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
   white-space: normal;
 }
 
-.leadsheet .ls-chord-trigger:hover .ls-chord-popover,
+.leadsheet .ls-chord-trigger:hover:not(.ls-popover-dismissed) .ls-chord-popover,
 .leadsheet .ls-chord-trigger:focus-visible .ls-chord-popover,
 .leadsheet .ls-chord-trigger.ls-popover-open .ls-chord-popover {
   display: block;
