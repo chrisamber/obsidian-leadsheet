@@ -6,6 +6,7 @@ import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@
 import { chordsOverLyricsToInline } from "./convert";
 import { parseSetlist, nextIndex, prevIndex } from "./setlist";
 import { ChordShape, chordDiagramData, uniqueChords } from "./diagrams";
+import { insertStarterLeadsheet } from "./starter";
 
 declare global {
   interface HTMLElementEventMap {
@@ -49,6 +50,12 @@ export default class LeadsheetPlugin extends Plugin {
 
     this.registerMarkdownCodeBlockProcessor("setlist", (src, el, ctx) => {
       renderSetlist(this, src, el, ctx.sourcePath);
+    });
+
+    this.addCommand({
+      id: "insert-starter-leadsheet",
+      name: "Insert starter leadsheet",
+      editorCallback: (editor) => insertStarterLeadsheet(editor),
     });
 
     this.addCommand({

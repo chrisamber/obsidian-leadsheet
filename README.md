@@ -7,7 +7,7 @@ per-file transpose, capo-aware shapes, guitar chord diagrams, set lists, and
 hands-free autoscroll. Chords align per-syllable, so CJK lyrics work without
 monospace tricks.
 
-![Leadsheet 0.5 running in Obsidian with a chord diagram popover](assets/screenshot.png)
+![Leadsheet running in Obsidian with a chord diagram popover](assets/screenshot.png)
 
 ## Features
 
@@ -28,22 +28,35 @@ monospace tricks.
 - **CLI** — validate, transpose, export to JSONL, and derive
   chord-progression frontmatter.
 
-## Usage
+## Quick start
 
-Put a song in a `leadsheet` code block, and reading view renders it:
+After enabling Leadsheet:
+
+1. Create or open a note.
+2. Open Obsidian's command palette and run **Leadsheet: Insert starter
+   leadsheet**. On iPad, open the command palette from the mobile menu.
+3. Edit the starter text, then tap outside the block or switch to Reading view.
+   Tap any chord to open its diagram.
+
+You can also copy this starter template directly:
 
 ![The ChordPro-style source on the left, its rendered leadsheet on the right](assets/syntax.png)
 
 ````markdown
 ```leadsheet
-{title: 茉莉花}
-{artist: Traditional}
+{title: My Song}
+{artist: Artist}
 {key: C}
+{capo: 0}
 {tempo: 72}
+{time: 4/4}
 
 {Verse}
-| [C]  [G/B] | [Am7] [Am7/G] |
-好一朵 [C]美麗的 茉莉[G/B]花
+| [C] | [F] [G] |
+[C]Write your lyrics [F]here
+
+{Chorus}
+[F]Add a chorus [G]here [C]too
 ```
 ````
 

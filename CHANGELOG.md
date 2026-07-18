@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0 — 2026-07-18
+
+### Added
+
+- **Leadsheet: Insert starter leadsheet** adds a valid, editable song block at
+  the cursor without replacing selected text.
+- Added the same copyable starter template and a short desktop/iPad workflow to
+  the README.
+- Added a scoped roadmap with measurable release gates through 1.0.
+
+### Changed
+
+- Refreshed the README hero from the actual Obsidian interface and documented
+  the Center/Left alignment control.
+
 ## 0.5.0 — 2026-07-16
 
 ### Added

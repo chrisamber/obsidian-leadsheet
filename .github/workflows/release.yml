@@ -17,6 +17,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Verify release version
+        run: >-
+          node -e "const m=require('./manifest.json').version;
+          const p=require('./package.json').version;
+          if(m!==process.env.GITHUB_REF_NAME||p!==m)
+          throw new Error('tag, manifest, and package versions must match')"
       - run: npm ci
       - run: npm run build
       - name: Attest release assets
@@ -24,6 +30,7 @@ jobs:
         with:
           subject-path: |
             main.js
+            manifest.json
             styles.css
       - name: Create release with plugin assets
         env:
