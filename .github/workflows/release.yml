@@ -19,12 +19,13 @@ jobs:
           node-version: 20
       - name: Verify release version
         run: >-
-          node -e "const m=require('./manifest.json').version;
+          node -e "const m=require('./manifest.json');
           const p=require('./package.json').version;
-          if(m!==process.env.GITHUB_REF_NAME||p!==m)
-          throw new Error('tag, manifest, and package versions must match')"
+          const v=require('./versions.json');
+          if(m.version!==process.env.GITHUB_REF_NAME||p!==m.version||v[m.version]!==m.minAppVersion)
+          throw new Error('tag, manifest, package, and versions map must agree')"
       - run: npm ci
-      - run: npm run build
+      - run: npm test
       - name: Attest release assets
         uses: actions/attest@v4
         with:

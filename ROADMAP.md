@@ -33,7 +33,7 @@ one minute.
 - Add a command that inserts the same starter `leadsheet` block into the
   current note.
 - Document the shortest desktop and iPad workflows.
-- Keep README screenshots captured from the released plugin in real Obsidian.
+- Keep the README hero captured from the released plugin in real Obsidian.
 
 **Exit gate:** timed from enabling the plugin, a clean desktop and iPad install
 can create and render the starter song in under one minute, without editing

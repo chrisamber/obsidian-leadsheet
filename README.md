@@ -40,7 +40,7 @@ After enabling Leadsheet:
 
 You can also copy this starter template directly:
 
-![The ChordPro-style source on the left, its rendered leadsheet on the right](assets/syntax.png)
+![Illustrated ChordPro-style source on the left and rendered leadsheet on the right](assets/syntax.png)
 
 ````markdown
 ```leadsheet
