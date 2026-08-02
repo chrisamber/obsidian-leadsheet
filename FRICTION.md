@@ -1,5 +1,16 @@
 # Friction
 
+## 2026-08-03 — Obsidian Stats scorecard lag
+
+- Symptom: Obsidian Stats scored Leadsheet **35/100** with blank stars/downloads,
+  0 commits/PRs, and latest version **Invalid date**, despite a healthy public
+  repo and release **0.6.0**.
+- Cause: Stats ingest left GitHub/download fields null; the score collapsed to
+  the two hygiene-ratio defaults (closed issues + resolved PRs).
+- Resolution: author-side metadata recovery (homepage, topics, manifest
+  author/help URLs) plus `docs/SCORECARD.md` with an upstream bug draft. Wait
+  one scrape cycle before filing; do not game ratios or rewrite release tags.
+
 ## 2026-07-16 — Release screenshot drift
 
 - Symptom: the README hero showed the pre-0.5 toolbar and omitted chord
