@@ -1,6 +1,11 @@
 import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
 import { parse, SongLine, transposeChord, transposeKey, isValidChord } from "./parser";
-import { clampCapo, scrollSpeedForDuration } from "./viewutils";
+import {
+  clampCapo,
+  scrollSpeedForDuration,
+  chordPopoverPlacement,
+  shouldHoldWakeLock,
+} from "./viewutils";
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { chordsOverLyricsToInline } from "./convert";
@@ -38,11 +43,24 @@ export default class LeadsheetPlugin extends Plugin {
   private scrollEl: HTMLElement | null = null;
   private scrollRaf = 0;
   private liveSpeed = 0; // px/s of the active scroll; adjustable mid-scroll
+  private openChordTrigger: HTMLButtonElement | null = null;
+  private performanceMode = false;
+  private wakeLock: WakeLockSentinel | null = null;
+  private wakeLockRequest: Promise<void> | null = null;
 
   async onload() {
     await this.loadSettings();
     activeDocument.body.style.setProperty("--ls-font-scale", String(this.settings.fontScale));
     activeDocument.body.classList.toggle("leadsheet-align-center", this.settings.align === "center");
+
+    this.registerDomEvent(activeDocument, "pointerdown", (event) => {
+      const target = event.target as Node | null;
+      if (target && !this.openChordTrigger?.contains(target)) this.closeChordPopover();
+    });
+    this.registerDomEvent(activeWindow, "resize", () => {
+      if (this.openChordTrigger) this.positionChordPopover(this.openChordTrigger);
+    });
+    this.registerDomEvent(activeDocument, "visibilitychange", () => this.syncWakeLock());
 
     this.registerMarkdownCodeBlockProcessor("leadsheet", (src, el, ctx) => {
       renderLeadsheet(this, src, el, ctx.sourcePath);
@@ -70,7 +88,7 @@ export default class LeadsheetPlugin extends Plugin {
     this.addCommand({
       id: "toggle-performance",
       name: "Toggle performance mode",
-      callback: () => activeDocument.body.classList.toggle("leadsheet-perf"),
+      callback: () => this.setPerformanceMode(!this.performanceMode),
     });
 
     this.addCommand({
@@ -90,9 +108,102 @@ export default class LeadsheetPlugin extends Plugin {
   }
 
   onunload() {
+    this.closeChordPopover();
+    this.performanceMode = false;
+    void this.releaseWakeLock();
     this.stopAutoscroll();
     activeDocument.body.classList.remove("leadsheet-perf", "leadsheet-align-center");
     activeDocument.body.style.removeProperty("--ls-font-scale");
+  }
+
+  private setPerformanceMode(active: boolean) {
+    this.performanceMode = active;
+    activeDocument.body.classList.toggle("leadsheet-perf", active);
+    this.syncWakeLock();
+  }
+
+  private syncWakeLock() {
+    const supported = "wakeLock" in activeWindow.navigator;
+    if (!shouldHoldWakeLock(
+      this.performanceMode,
+      activeDocument.visibilityState,
+      supported
+    )) {
+      void this.releaseWakeLock();
+      return;
+    }
+    if (this.wakeLock || this.wakeLockRequest) return;
+    this.wakeLockRequest = this.requestWakeLock().finally(() => {
+      this.wakeLockRequest = null;
+    });
+  }
+
+  private async requestWakeLock() {
+    try {
+      const sentinel = await activeWindow.navigator.wakeLock.request("screen");
+      if (!shouldHoldWakeLock(
+        this.performanceMode,
+        activeDocument.visibilityState,
+        true
+      )) {
+        await sentinel.release();
+        return;
+      }
+      this.wakeLock = sentinel;
+      sentinel.addEventListener("release", () => {
+        if (this.wakeLock === sentinel) this.wakeLock = null;
+      }, { once: true });
+    } catch {
+      this.wakeLock = null;
+    }
+  }
+
+  private async releaseWakeLock() {
+    const sentinel = this.wakeLock;
+    this.wakeLock = null;
+    if (!sentinel) return;
+    try {
+      await sentinel.release();
+    } catch {
+      // Native wake-lock loss and unsupported implementations are safe no-ops.
+    }
+  }
+
+  toggleChordPopover(trigger: HTMLButtonElement): boolean {
+    if (this.openChordTrigger === trigger) {
+      this.closeChordPopover(true);
+      return false;
+    }
+    this.closeChordPopover();
+    this.openChordTrigger = trigger;
+    trigger.addClass("ls-popover-open");
+    this.positionChordPopover(trigger);
+    return true;
+  }
+
+  closeChordPopover(suppressHover = false) {
+    const trigger = this.openChordTrigger;
+    if (!trigger) return;
+    trigger.removeClass("ls-popover-open");
+    trigger.toggleClass("ls-popover-dismissed", suppressHover);
+    this.openChordTrigger = null;
+  }
+
+  private positionChordPopover(trigger: HTMLButtonElement) {
+    const popover = trigger.querySelector<HTMLElement>(".ls-chord-popover");
+    const win = trigger.ownerDocument.defaultView;
+    if (!popover || !win) return;
+
+    popover.style.removeProperty("--ls-popover-shift-x");
+    popover.removeClass("ls-popover-below");
+    const popoverRect = popover.getBoundingClientRect();
+    const placement = chordPopoverPlacement(
+      trigger.getBoundingClientRect(),
+      { width: popoverRect.width, height: popoverRect.height },
+      { width: win.innerWidth, height: win.innerHeight }
+    );
+    popover.style.setProperty("--ls-popover-shift-x", `${placement.shiftX}px`);
+    popover.toggleClass("ls-popover-below", placement.below);
   }
 
   isScrolling(): boolean {
@@ -304,6 +415,7 @@ function renderLeadsheet(
   };
 
   function redraw() {
+    plugin.closeChordPopover();
     const offset = getOffset();
     const shapeShift = plugin.settings.chordMode === "shapes" ? -capo : 0;
     const displayOffset = offset + shapeShift;
@@ -325,7 +437,7 @@ function renderLeadsheet(
       }
     }
     body.empty();
-    for (const line of song.lines) renderLine(body, line, displayOffset, useFlats);
+    for (const line of song.lines) renderLine(plugin, body, line, displayOffset, useFlats);
   }
   redraw();
 }
@@ -381,7 +493,13 @@ function formatDuration(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlats: boolean) {
+function renderLine(
+  plugin: LeadsheetPlugin,
+  parent: HTMLElement,
+  line: SongLine,
+  offset: number,
+  useFlats: boolean
+) {
   if (line.type === "empty") {
     parent.createDiv({ cls: "ls-gap" });
     return;
@@ -401,20 +519,26 @@ function renderLine(parent: HTMLElement, line: SongLine, offset: number, useFlat
   if (line.segments.every((s) => /^[\s|.·:]*$/.test(s.text))) {
     div.addClass("ls-barline");
     for (const seg of line.segments) {
-      if (seg.chord) renderChord(div, seg.chord, offset, useFlats);
+      if (seg.chord) renderChord(plugin, div, seg.chord, offset, useFlats);
       if (seg.text) div.createSpan({ text: seg.text });
     }
     return;
   }
   for (const seg of line.segments) {
     const span = div.createSpan({ cls: "ls-seg" });
-    if (seg.chord) renderChord(span, seg.chord, offset, useFlats);
+    if (seg.chord) renderChord(plugin, span, seg.chord, offset, useFlats);
     else span.createSpan({ cls: "ls-chord" });
     span.createSpan({ cls: "ls-lyric", text: seg.text || " " });
   }
 }
 
-function renderChord(parent: HTMLElement, chord: string, offset: number, useFlats: boolean) {
+function renderChord(
+  plugin: LeadsheetPlugin,
+  parent: HTMLElement,
+  chord: string,
+  offset: number,
+  useFlats: boolean
+) {
   const { name, shape } = chordDiagramData(chord, offset, useFlats);
   if (!shape) {
     parent.createSpan({ cls: "ls-chord", text: name });
@@ -430,21 +554,15 @@ function renderChord(parent: HTMLElement, chord: string, offset: number, useFlat
   const popover = trigger.createSpan({ cls: "ls-chord-popover", attr: { role: "tooltip" } });
   popover.appendChild(renderChordDiagram(name, shape, parent.doc));
   const resetHoverDismissal = () => trigger.removeClass("ls-popover-dismissed");
-  const suppressHoverUntilPointerChange = () => trigger.addClass("ls-popover-dismissed");
   trigger.addEventListener("pointerenter", resetHoverDismissal);
   trigger.addEventListener("pointerleave", resetHoverDismissal);
   trigger.addEventListener("click", () => {
-    const open = trigger.classList.toggle("ls-popover-open");
-    if (!open) {
-      suppressHoverUntilPointerChange();
-      trigger.blur();
-    }
+    if (!plugin.toggleChordPopover(trigger)) trigger.blur();
   });
-  trigger.addEventListener("blur", () => trigger.removeClass("ls-popover-open"));
+  trigger.addEventListener("blur", () => plugin.closeChordPopover());
   trigger.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    suppressHoverUntilPointerChange();
-    trigger.removeClass("ls-popover-open");
+    plugin.closeChordPopover(true);
     trigger.blur();
   });
 }

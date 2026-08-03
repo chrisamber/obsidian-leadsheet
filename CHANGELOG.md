@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Performance mode keeps the screen awake on supported platforms and safely
+  falls back when Screen Wake Lock is unavailable.
+
+### Changed
+
+- Mobile toolbar and setlist navigation controls now use touch-sized targets
+  and remain reachable during performance.
+- Chord diagram popovers stay inside the viewport and close on outside tap.
+
 ## 0.6.0 — 2026-07-21
 
 ### Added

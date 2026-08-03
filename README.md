@@ -69,7 +69,9 @@ The toolbar gives you:
   song's frontmatter has `duration:` (seconds), ▶ paces the whole sheet over
   that time. Tap the sheet body to pause.
 - **A− / A+** — grow/shrink the leadsheet font (global). *Leadsheet: Toggle
-  performance mode* hides the app chrome for music-stand use.
+  performance mode* hides the app chrome, keeps essential controls reachable
+  on mobile, and keeps the screen awake when the platform supports Screen Wake
+  Lock.
 - **Center / Left** — switch the sheet alignment globally.
 - **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
   the shapes your hands play. Bad capo values (outside 0–11) are flagged and

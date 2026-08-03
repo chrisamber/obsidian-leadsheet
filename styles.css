@@ -161,9 +161,14 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
   box-shadow: var(--shadow-l, 0 8px 24px rgb(0 0 0 / 18%));
   color: var(--text-normal);
   line-height: 1;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--ls-popover-shift-x, 0px)));
   pointer-events: none;
   white-space: normal;
+}
+
+.leadsheet .ls-chord-popover.ls-popover-below {
+  top: calc(100% + 0.55em);
+  bottom: auto;
 }
 
 .leadsheet .ls-chord-trigger:hover:not(.ls-popover-dismissed) .ls-chord-popover,
@@ -257,4 +262,51 @@ body.leadsheet-perf .app-container .view-header {
   margin: 1.2em 0;
   padding-top: 0.4em;
   border-top: 1px solid var(--background-modifier-border);
+}
+
+@media (max-width: 600px) {
+  .leadsheet .ls-toolbar {
+    align-items: stretch;
+    gap: 0.4em;
+  }
+
+  .leadsheet .ls-titlebox {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .leadsheet .ls-controls {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .leadsheet .ls-controls button,
+  .leadsheet button.ls-mode,
+  .leadsheet-setlist .ls-setlist-nav button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  .leadsheet .ls-speed {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+  }
+
+  body.leadsheet-perf .leadsheet .ls-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--background-primary);
+  }
+
+  .leadsheet-setlist .ls-setlist-nav {
+    z-index: 3;
+  }
+
+  body.leadsheet-perf .leadsheet-setlist .leadsheet .ls-toolbar {
+    top: 52px;
+  }
 }
