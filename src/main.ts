@@ -9,7 +9,15 @@ import {
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { chordsOverLyricsToInline } from "./convert";
-import { parseSetlist, nextIndex, prevIndex } from "./setlist";
+import {
+  parseSetlist,
+  nextIndex,
+  prevIndex,
+  songDurationSec,
+  summaryLabel,
+  formatDuration,
+  SONG_BLOCK_RE,
+} from "./setlist";
 import { ChordShape, chordDiagramData, uniqueChords } from "./diagrams";
 import { insertStarterLeadsheet } from "./starter";
 
@@ -442,39 +450,60 @@ function renderLeadsheet(
   redraw();
 }
 
-const SONG_BLOCK_RE = /```leadsheet\r?\n([\s\S]*?)```/;
-
 function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, sourcePath: string) {
   el.addClass("leadsheet-setlist");
   const targets = parseSetlist(src);
   const nav = el.createDiv({ cls: "ls-setlist-nav" });
+  const summary = nav.createSpan({ cls: "ls-meta ls-setlist-summary" });
+  const pos = nav.createSpan({ cls: "ls-meta ls-setlist-pos", attr: { "aria-live": "polite" } });
   const anchors: HTMLElement[] = [];
   let cur = 0;
+  let missing = 0;
+  // Total duration accumulates as song files resolve; the label stays honest
+  // about what is known so far rather than blocking on all reads.
+  let knownSec = 0;
+  const updateSummary = () =>
+    (summary.textContent = summaryLabel(targets.length, missing, knownSec));
+  const updatePos = () =>
+    (pos.textContent = targets.length ? `${cur + 1}/${targets.length} · ${targets[cur]}` : "");
 
   targets.forEach((name) => {
     const dest = plugin.app.metadataCache.getFirstLinkpathDest(name, sourcePath);
     const songEl = el.createDiv({ cls: "ls-setlist-song" });
     anchors.push(songEl);
     if (!dest) {
+      missing++;
       songEl.createDiv({ cls: "ls-meta ls-warn", text: `⚠ song not found: ${name}` });
       return;
     }
     songEl.createDiv({ cls: "ls-section", text: name });
     void plugin.app.vault.cachedRead(dest)
       .then((text: string) => {
+        const sec = songDurationSec(text);
+        if (sec) {
+          knownSec += sec;
+          updateSummary();
+        }
         const m = text.match(SONG_BLOCK_RE);
         if (m) renderLeadsheet(plugin, m[1], songEl.createDiv(), dest.path);
         else songEl.createDiv({ cls: "ls-meta", text: "(no leadsheet block)" });
       })
       .catch(() => songEl.createDiv({ cls: "ls-meta ls-warn", text: "(failed to read song)" }));
   });
+  updateSummary();
+  updatePos();
 
+  // Navigating always stops autoscroll so playback never bleeds into the next song.
   const go = (i: number) => {
+    plugin.stopAutoscroll();
     cur = i;
+    updatePos();
     anchors[cur]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  nav.createEl("button", { text: "◀ Prev" }).onclick = () => go(prevIndex(cur, anchors.length));
-  nav.createEl("button", { text: "Next ▶" }).onclick = () => go(nextIndex(cur, anchors.length));
+  nav.createEl("button", { text: "◀ Prev", attr: { "aria-label": "Previous song" } }).onclick =
+    () => go(prevIndex(cur, anchors.length));
+  nav.createEl("button", { text: "Next ▶", attr: { "aria-label": "Next song" } }).onclick =
+    () => go(nextIndex(cur, anchors.length));
 }
 
 // A metadata chip: a Lucide icon + value, e.g. ♪ Key C. `label` sets aria-label
@@ -485,12 +514,6 @@ function metaChip(parent: HTMLElement, icon: string, text: string, label: string
   setIcon(chip.createSpan({ cls: "ls-chip-icon" }), icon);
   chip.createSpan({ cls: "ls-chip-text", text });
   return chip;
-}
-
-function formatDuration(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function renderLine(
