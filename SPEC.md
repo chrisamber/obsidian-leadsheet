@@ -76,9 +76,18 @@ Unknown extra fields are allowed and ignored by the plugin.
   `{chord, text}`; each segment renders as inline-block with the chord stacked
   above the text. This aligns correctly for CJK lyrics (no monospace tricks).
 - Lines with no chords render as plain lyrics (no empty chord row).
-- Toolbar: title/artist, current key (updates with transpose), capo, tempo,
-  transpose − / reset / +, chord-diagram toggle ▦, autoscroll ▶/⏸ and
-  speed − / +.
+- Chord-only lines render as a measure strip: pipes are bar lines, `|:` / `:|`
+  repeat signs and `||` double bars are kept, and `.` / `·` beat marks stay in
+  their measure (`barTokens` in `src/viewutils.ts`).
+- Each section renders as a block tagged with a coarse role from its label
+  (`sectionKind`: verse, prechorus, chorus, bridge, instrumental, other).
+  Choruses get a filled label and a margin bar.
+- Header: title/artist plus metadata pills — current key (updates with
+  transpose), capo (hidden at 0), tempo, time, duration.
+- Toolbar: labeled groups for transpose − / reset / + (with a Shapes toggle
+  when a capo is set), autoscroll speed and ▶/⏸, text size, and toggles for
+  alignment, the chord-diagram strip, and performance mode. Icons come from
+  Obsidian's Lucide set with text fallbacks.
 - Chord diagrams: toggling ▦ shows a strip of guitar fingering diagrams
   (standard tuning) for the song's chords, in order of first appearance,
   deduped after transpose. Shapes come from a curated open-position dictionary

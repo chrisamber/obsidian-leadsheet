@@ -1,10 +1,22 @@
-import { App, MarkdownView, Plugin, PluginSettingTab, Setting, setIcon } from "obsidian";
-import { parse, SongLine, transposeChord, transposeKey, isValidChord } from "./parser";
+import {
+  App,
+  Component,
+  Keymap,
+  MarkdownRenderChild,
+  MarkdownView,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  setIcon,
+} from "obsidian";
+import { parse, Segment, SongLine, transposeKey, isValidChord } from "./parser";
 import {
   clampCapo,
   scrollSpeedForDuration,
   chordPopoverPlacement,
   shouldHoldWakeLock,
+  sectionKind,
+  barTokens,
 } from "./viewutils";
 import { Extension, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
@@ -25,6 +37,7 @@ declare global {
   interface HTMLElementEventMap {
     "leadsheet-scroll-stopped": CustomEvent<void>;
     "leadsheet-speed-changed": CustomEvent<void>;
+    "leadsheet-perf-changed": CustomEvent<void>;
   }
 }
 
@@ -70,12 +83,18 @@ export default class LeadsheetPlugin extends Plugin {
     });
     this.registerDomEvent(activeDocument, "visibilitychange", () => this.syncWakeLock());
 
+    // Each block owns a render child so its body-level listeners are removed
+    // when Obsidian re-renders or unloads the block.
     this.registerMarkdownCodeBlockProcessor("leadsheet", (src, el, ctx) => {
-      renderLeadsheet(this, src, el, ctx.sourcePath);
+      const child = new MarkdownRenderChild(el);
+      ctx.addChild(child);
+      renderLeadsheet(this, child, src, el, ctx.sourcePath);
     });
 
     this.registerMarkdownCodeBlockProcessor("setlist", (src, el, ctx) => {
-      renderSetlist(this, src, el, ctx.sourcePath);
+      const child = new MarkdownRenderChild(el);
+      ctx.addChild(child);
+      renderSetlist(this, child, src, el, ctx.sourcePath);
     });
 
     this.addCommand({
@@ -96,7 +115,7 @@ export default class LeadsheetPlugin extends Plugin {
     this.addCommand({
       id: "toggle-performance",
       name: "Toggle performance mode",
-      callback: () => this.setPerformanceMode(!this.performanceMode),
+      callback: () => this.togglePerformanceMode(),
     });
 
     this.addCommand({
@@ -124,10 +143,17 @@ export default class LeadsheetPlugin extends Plugin {
     activeDocument.body.style.removeProperty("--ls-font-scale");
   }
 
-  private setPerformanceMode(active: boolean) {
-    this.performanceMode = active;
-    activeDocument.body.classList.toggle("leadsheet-perf", active);
+  isPerformanceMode(): boolean {
+    return this.performanceMode;
+  }
+
+  togglePerformanceMode() {
+    this.performanceMode = !this.performanceMode;
+    const body = activeDocument.body;
+    body.classList.toggle("leadsheet-perf", this.performanceMode);
     this.syncWakeLock();
+    const win = body.doc.defaultView;
+    if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-perf-changed"));
   }
 
   private syncWakeLock() {
@@ -286,6 +312,7 @@ export default class LeadsheetPlugin extends Plugin {
 
 function renderLeadsheet(
   plugin: LeadsheetPlugin,
+  owner: Component,
   src: string,
   el: HTMLElement,
   sourcePath: string
@@ -302,7 +329,8 @@ function renderLeadsheet(
   }
   el.addClass("leadsheet");
 
-  const toolbar = el.createDiv({ cls: "ls-toolbar" });
+  const header = el.createDiv({ cls: "ls-header" });
+  const toolbar = el.createDiv({ cls: "ls-toolbar", attr: { role: "group", "aria-label": "Leadsheet controls" } });
   const diagrams = el.createDiv({ cls: "ls-diagrams" });
   const body = el.createDiv({ cls: "ls-body" });
   const chordList = uniqueChords(song);
@@ -311,26 +339,28 @@ function renderLeadsheet(
     if (plugin.isScrolling()) plugin.stopAutoscroll();
   });
 
-  // --- metadata (icon chips) ---
-  const titleBox = toolbar.createDiv({ cls: "ls-titlebox" });
-  if (song.meta.title) titleBox.createSpan({ cls: "ls-title", text: song.meta.title });
-  if (song.meta.artist) titleBox.createSpan({ cls: "ls-meta", text: song.meta.artist });
+  // --- title + metadata chips ---
+  const titleBox = header.createDiv({ cls: "ls-titlebox" });
+  if (song.meta.title) titleBox.createDiv({ cls: "ls-title", text: song.meta.title });
+  if (song.meta.artist) titleBox.createDiv({ cls: "ls-meta ls-artist", text: song.meta.artist });
 
-  const keyChip = metaChip(toolbar, "music", "", "Key");
+  const chips = header.createDiv({ cls: "ls-chips" });
+  const keyChip = metaChip(chips, "music", "", "Key");
   const keyText = keyChip.querySelector(".ls-chip-text") as HTMLElement;
 
   const { capo, bad: capoBad } = clampCapo(song.meta.capo);
-  if (song.meta.capo) {
-    const chip = metaChip(toolbar, "guitar", capoBad ? `${song.meta.capo}→${capo}` : `Capo ${capo}`,
+  // Capo 0 is the default; only show the chip when it changes what you play.
+  if (capo > 0 || capoBad) {
+    const chip = metaChip(chips, "guitar", capoBad ? `Capo ${song.meta.capo}→${capo}` : `Capo ${capo}`,
       capoBad ? `Invalid capo ${song.meta.capo}; clamped to ${capo}` : `Capo ${capo}`);
     if (capoBad) chip.addClass("ls-warn");
   }
-  if (song.meta.tempo) metaChip(toolbar, "gauge", `${song.meta.tempo} BPM`, "Tempo");
-  if (song.meta.time) metaChip(toolbar, "music-4", song.meta.time, "Time signature");
+  if (song.meta.tempo) metaChip(chips, "gauge", `${song.meta.tempo} BPM`, "Tempo");
+  if (song.meta.time) metaChip(chips, "music-4", song.meta.time, "Time signature");
   const durationSec = Number(song.meta.duration) || 0;
-  if (durationSec > 0) metaChip(toolbar, "timer", formatDuration(durationSec), "Duration");
+  if (durationSec > 0) metaChip(chips, "timer", formatDuration(durationSec), "Duration");
 
-  // --- transpose controls ---
+  // --- transpose ---
   const getOffset = () => plugin.settings.offsets[sourcePath] ?? 0;
   const setOffset = async (n: number) => {
     if (n === 0) delete plugin.settings.offsets[sourcePath];
@@ -339,18 +369,23 @@ function renderLeadsheet(
     redraw();
   };
 
-  const tr = toolbar.createDiv({ cls: "ls-controls" });
-  const minus = tr.createEl("button", { text: "−", attr: { "aria-label": "Transpose down" } });
-  const reset = tr.createEl("button", { cls: "ls-offset" });
-  const plus = tr.createEl("button", { text: "+", attr: { "aria-label": "Transpose up" } });
+  const tr = controlGroup(toolbar, "Transpose");
+  const minus = iconButton(tr, "minus", "Transpose down", "−");
+  const reset = tr.createEl("button", { cls: "ls-offset", attr: { type: "button", "aria-label": "Reset transpose" } });
+  const plus = iconButton(tr, "plus", "Transpose up", "+");
   minus.onclick = () => setOffset(getOffset() - 1);
   plus.onclick = () => setOffset(getOffset() + 1);
   reset.onclick = () => setOffset(0);
 
   // --- capo shape toggle (only meaningful when a capo is set) ---
   if (capo > 0) {
-    const modeBtn = toolbar.createEl("button", { cls: "ls-mode", attr: { "aria-label": "Toggle chord display" } });
-    const syncMode = () => (modeBtn.textContent = plugin.settings.chordMode === "shapes" ? "Shapes" : "Sounding");
+    // A stable label with a pressed state: off shows sounding pitch.
+    const modeBtn = tr.createEl("button", {
+      cls: "ls-mode",
+      text: "Shapes",
+      attr: { type: "button", "aria-label": `Show capo shapes (capo ${capo})` },
+    });
+    const syncMode = () => pressed(modeBtn, plugin.settings.chordMode === "shapes");
     syncMode();
     modeBtn.onclick = async () => {
       plugin.settings.chordMode = plugin.settings.chordMode === "shapes" ? "sounding" : "shapes";
@@ -360,60 +395,55 @@ function renderLeadsheet(
     };
   }
 
-  // --- chord diagram toggle ---
-  const diaBtn = toolbar.createEl("button", {
-    text: "▦",
-    cls: "ls-mode",
-    attr: { "aria-label": "Toggle chord diagrams" },
-  });
-  const syncDia = () => diaBtn.toggleClass("ls-active", plugin.settings.showDiagrams);
-  syncDia();
-  diaBtn.onclick = async () => {
-    plugin.settings.showDiagrams = !plugin.settings.showDiagrams;
-    await plugin.saveSettings();
-    syncDia();
-    redraw();
-  };
-
-  // --- autoscroll controls ---
-  const sc = toolbar.createDiv({ cls: "ls-controls" });
-  const slower = sc.createEl("button", { text: "▾", attr: { "aria-label": "Scroll slower" } });
-  const play = sc.createEl("button", { attr: { "aria-label": "Toggle autoscroll" } });
-  const faster = sc.createEl("button", { text: "▴", attr: { "aria-label": "Scroll faster" } });
+  // --- autoscroll ---
+  const sc = controlGroup(toolbar, "Scroll");
+  const slower = iconButton(sc, "chevron-down", "Scroll slower", "▾");
+  const play = iconButton(sc, "play", "Toggle autoscroll", "▶");
+  play.addClass("ls-play");
+  const faster = iconButton(sc, "chevron-up", "Scroll faster", "▴");
   const speedOut = sc.createSpan({ cls: "ls-speed", attr: { "aria-label": "Scroll speed (px/s)" } });
-  const updatePlay = () => (play.textContent = plugin.isScrolling() ? "⏸" : "▶");
+  const updatePlay = () => {
+    const on = plugin.isScrolling();
+    setButtonIcon(play, on ? "pause" : "play", on ? "⏸" : "▶");
+    pressed(play, on);
+  };
   const updateSpeed = () => (speedOut.textContent = `${plugin.currentSpeed()}`);
   updatePlay();
   updateSpeed();
   play.onclick = () => {
     const scrollEl = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
-    if (scrollEl) plugin.toggleAutoscroll(scrollEl, Number(song.meta.duration) || 0);
+    if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec);
     updatePlay();
     updateSpeed();
   };
   slower.onclick = () => plugin.adjustSpeed(-5, hostBody);
   faster.onclick = () => plugin.adjustSpeed(5, hostBody);
-  plugin.registerDomEvent(hostBody, "leadsheet-scroll-stopped", () => {
+  owner.registerDomEvent(hostBody, "leadsheet-scroll-stopped", () => {
     updatePlay();
     updateSpeed();
   });
-  plugin.registerDomEvent(hostBody, "leadsheet-speed-changed", updateSpeed);
+  owner.registerDomEvent(hostBody, "leadsheet-speed-changed", updateSpeed);
 
-  // --- font-size controls (global; drives --ls-font-scale) ---
+  // --- font size (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
     plugin.settings.fontScale = Math.min(3, Math.max(0.6, Math.round(scale * 10) / 10));
     hostBody.style.setProperty("--ls-font-scale", String(plugin.settings.fontScale));
     await plugin.saveSettings();
   };
-  const fz = toolbar.createDiv({ cls: "ls-controls" });
-  fz.createEl("button", { text: "A−", attr: { "aria-label": "Font smaller" } }).onclick = () =>
+  const fz = controlGroup(toolbar, null, "Font size");
+  iconButton(fz, "a-arrow-down", "Font smaller", "A−").onclick = () =>
     setFont(plugin.settings.fontScale - 0.1);
-  fz.createEl("button", { text: "A+", attr: { "aria-label": "Font larger" } }).onclick = () =>
+  iconButton(fz, "a-arrow-up", "Font larger", "A+").onclick = () =>
     setFont(plugin.settings.fontScale + 0.1);
 
-  // --- alignment toggle (global; drives body.leadsheet-align-center) ---
-  const alignBtn = toolbar.createEl("button", { cls: "ls-mode", attr: { "aria-label": "Toggle alignment" } });
-  const syncAlign = () => (alignBtn.textContent = plugin.settings.align === "center" ? "Center" : "Left");
+  // --- view toggles: alignment, diagram strip, performance mode ---
+  const view = controlGroup(toolbar, null, "View");
+  const alignBtn = iconButton(view, "align-left", "Center the sheet", "Left");
+  const syncAlign = () => {
+    const center = plugin.settings.align === "center";
+    setButtonIcon(alignBtn, center ? "align-center" : "align-left", center ? "Center" : "Left");
+    pressed(alignBtn, center);
+  };
   syncAlign();
   alignBtn.onclick = async () => {
     plugin.settings.align = plugin.settings.align === "center" ? "left" : "center";
@@ -421,6 +451,25 @@ function renderLeadsheet(
     await plugin.saveSettings();
     syncAlign();
   };
+
+  const diaBtn = iconButton(view, "grid", "Toggle chord diagrams", "▦");
+  pressed(diaBtn, plugin.settings.showDiagrams);
+  diaBtn.onclick = async () => {
+    plugin.settings.showDiagrams = !plugin.settings.showDiagrams;
+    await plugin.saveSettings();
+    pressed(diaBtn, plugin.settings.showDiagrams);
+    redraw();
+  };
+
+  const perfBtn = iconButton(view, "maximize-2", "Toggle performance mode", "⛶");
+  const syncPerf = () => {
+    const on = plugin.isPerformanceMode();
+    setButtonIcon(perfBtn, on ? "minimize-2" : "maximize-2", "⛶");
+    pressed(perfBtn, on);
+  };
+  syncPerf();
+  perfBtn.onclick = () => plugin.togglePerformanceMode();
+  owner.registerDomEvent(hostBody, "leadsheet-perf-changed", syncPerf);
 
   function redraw() {
     plugin.closeChordPopover();
@@ -445,17 +494,36 @@ function renderLeadsheet(
       }
     }
     body.empty();
-    for (const line of song.lines) renderLine(plugin, body, line, displayOffset, useFlats);
+    // Each section is a block (label + lines) so choruses and instrumental
+    // bars can be styled as units; lines before the first label are untitled.
+    let lines = body.createDiv({ cls: "ls-block" }).createDiv({ cls: "ls-lines" });
+    for (const line of song.lines) {
+      if (line.type === "section") {
+        const block = body.createDiv({ cls: "ls-block", attr: { "data-section": sectionKind(line.name) } });
+        block.createDiv({ cls: "ls-section" }).createSpan({ cls: "ls-section-label", text: line.name });
+        lines = block.createDiv({ cls: "ls-lines" });
+        continue;
+      }
+      renderLine(plugin, lines, line, displayOffset, useFlats);
+    }
   }
   redraw();
 }
 
-function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, sourcePath: string) {
+function renderSetlist(
+  plugin: LeadsheetPlugin,
+  owner: Component,
+  src: string,
+  el: HTMLElement,
+  sourcePath: string
+) {
   el.addClass("leadsheet-setlist");
   const targets = parseSetlist(src);
   const nav = el.createDiv({ cls: "ls-setlist-nav" });
-  const summary = nav.createSpan({ cls: "ls-meta ls-setlist-summary" });
-  const pos = nav.createSpan({ cls: "ls-meta ls-setlist-pos", attr: { "aria-live": "polite" } });
+  const info = nav.createDiv({ cls: "ls-setlist-info" });
+  const pos = info.createDiv({ cls: "ls-setlist-pos", attr: { "aria-live": "polite" } });
+  const summary = info.createDiv({ cls: "ls-meta ls-setlist-summary" });
+  const buttons = controlGroup(nav, null, "Song navigation");
   const anchors: HTMLElement[] = [];
   let cur = 0;
   let missing = 0;
@@ -464,19 +532,42 @@ function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, so
   let knownSec = 0;
   const updateSummary = () =>
     (summary.textContent = summaryLabel(targets.length, missing, knownSec));
-  const updatePos = () =>
-    (pos.textContent = targets.length ? `${cur + 1}/${targets.length} · ${targets[cur]}` : "");
+  const updatePos = () => {
+    pos.empty();
+    if (!targets.length) return;
+    pos.createSpan({ cls: "ls-setlist-count", text: `${cur + 1}/${targets.length}` });
+    pos.createSpan({ cls: "ls-setlist-current", text: targets[cur] });
+  };
 
-  targets.forEach((name) => {
+  targets.forEach((name, i) => {
     const dest = plugin.app.metadataCache.getFirstLinkpathDest(name, sourcePath);
     const songEl = el.createDiv({ cls: "ls-setlist-song" });
     anchors.push(songEl);
+    const divider = songEl.createDiv({ cls: "ls-setlist-divider" });
+    divider.createSpan({ cls: "ls-setlist-num", text: String(i + 1).padStart(2, "0") });
+    // Clicking opens the song; an unresolved link offers to create it. A span
+    // rather than an <a href> / .internal-link, so Obsidian's own link handler
+    // does not navigate a second time (a known crash path on Android).
+    const link = divider.createSpan({
+      cls: dest ? "ls-setlist-link" : "ls-setlist-link is-unresolved",
+      text: name,
+      attr: { role: "link", tabindex: "0" },
+    });
+    const open = (event: MouseEvent | KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void plugin.app.workspace.openLinkText(name, sourcePath, Keymap.isModEvent(event));
+    };
+    link.addEventListener("click", open);
+    link.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") open(event);
+    });
     if (!dest) {
       missing++;
-      songEl.createDiv({ cls: "ls-meta ls-warn", text: `⚠ song not found: ${name}` });
+      songEl.addClass("ls-setlist-missing");
+      divider.createSpan({ cls: "ls-setlist-note", text: "Note not found — click to create" });
       return;
     }
-    songEl.createDiv({ cls: "ls-section", text: name });
     void plugin.app.vault.cachedRead(dest)
       .then((text: string) => {
         const sec = songDurationSec(text);
@@ -485,24 +576,44 @@ function renderSetlist(plugin: LeadsheetPlugin, src: string, el: HTMLElement, so
           updateSummary();
         }
         const m = text.match(SONG_BLOCK_RE);
-        if (m) renderLeadsheet(plugin, m[1], songEl.createDiv(), dest.path);
-        else songEl.createDiv({ cls: "ls-meta", text: "(no leadsheet block)" });
+        if (m) renderLeadsheet(plugin, owner, m[1], songEl.createDiv({ cls: "ls-nested" }), dest.path);
+        else songEl.createDiv({ cls: "ls-meta", text: "No leadsheet block in this note." });
       })
-      .catch(() => songEl.createDiv({ cls: "ls-meta ls-warn", text: "(failed to read song)" }));
+      .catch(() => songEl.createDiv({ cls: "ls-meta ls-warn", text: "Failed to read song." }));
   });
   updateSummary();
   updatePos();
+
+  // Follow manual scrolling: the current song is the last one whose top has
+  // reached the upper 40% of the view. Paused briefly after Prev/Next so a
+  // short final song that cannot scroll to the top still stays selected.
+  let navUntil = 0;
+  const observer = new IntersectionObserver(() => {
+    if (Date.now() < navUntil) return;
+    const line = el.win.innerHeight * 0.4;
+    let i = 0;
+    anchors.forEach((a, j) => {
+      if (a.getBoundingClientRect().top <= line) i = j;
+    });
+    if (i !== cur) {
+      cur = i;
+      updatePos();
+    }
+  }, { rootMargin: "0px 0px -60% 0px" });
+  anchors.forEach((a) => observer.observe(a));
+  owner.register(() => observer.disconnect());
 
   // Navigating always stops autoscroll so playback never bleeds into the next song.
   const go = (i: number) => {
     plugin.stopAutoscroll();
     cur = i;
+    navUntil = Date.now() + 1000;
     updatePos();
     anchors[cur]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  nav.createEl("button", { text: "◀ Prev", attr: { "aria-label": "Previous song" } }).onclick =
+  iconButton(buttons, "chevron-left", "Previous song", "◀").onclick =
     () => go(prevIndex(cur, anchors.length));
-  nav.createEl("button", { text: "Next ▶", attr: { "aria-label": "Next song" } }).onclick =
+  iconButton(buttons, "chevron-right", "Next song", "▶").onclick =
     () => go(nextIndex(cur, anchors.length));
 }
 
@@ -516,6 +627,34 @@ function metaChip(parent: HTMLElement, icon: string, text: string, label: string
   return chip;
 }
 
+// A segmented control group. A visible label doubles as the group's
+// accessible name; self-explanatory icon clusters pass null and a name only.
+function controlGroup(parent: HTMLElement, label: string | null, name = label): HTMLElement {
+  const group = parent.createDiv({ cls: "ls-controls", attr: { role: "group" } });
+  if (name) group.setAttr("aria-label", name);
+  if (label) group.createSpan({ cls: "ls-group-label", text: label, attr: { "aria-hidden": "true" } });
+  return group;
+}
+
+function iconButton(parent: HTMLElement, icon: string, label: string, fallback: string): HTMLButtonElement {
+  const btn = parent.createEl("button", { cls: "ls-icon-btn", attr: { type: "button", "aria-label": label } });
+  setButtonIcon(btn, icon, fallback);
+  return btn;
+}
+
+// Icon sets differ across Obsidian versions; fall back to a text glyph rather
+// than leaving an empty button.
+function setButtonIcon(btn: HTMLElement, icon: string, fallback: string) {
+  btn.empty();
+  setIcon(btn, icon);
+  if (!btn.querySelector("svg")) btn.setText(fallback);
+}
+
+function pressed(btn: HTMLElement, on: boolean) {
+  btn.toggleClass("ls-active", on);
+  btn.setAttr("aria-pressed", String(on));
+}
+
 function renderLine(
   plugin: LeadsheetPlugin,
   parent: HTMLElement,
@@ -527,31 +666,46 @@ function renderLine(
     parent.createDiv({ cls: "ls-gap" });
     return;
   }
-  if (line.type === "section") {
-    parent.createDiv({ cls: "ls-section", text: line.name });
-    return;
-  }
+  if (line.type === "section") return; // sections open blocks in redraw()
   const hasChords = line.segments.some((s) => s.chord !== null);
   const div = parent.createDiv({ cls: "ls-line" });
   if (!hasChords) {
+    div.addClass("ls-lyric-only");
     div.setText(line.segments.map((s) => s.text).join(""));
     return;
   }
-  // Chord-only lines (bar lines like "| [C] [G/B] |"): render chords inline
-  // between the pipes instead of stacking them above.
+  // Chord-only lines (bar lines like "| [C] [G/B] |") render as a measure
+  // grid instead of stacking chords above empty lyrics.
   if (line.segments.every((s) => /^[\s|.·:]*$/.test(s.text))) {
-    div.addClass("ls-barline");
-    for (const seg of line.segments) {
-      if (seg.chord) renderChord(plugin, div, seg.chord, offset, useFlats);
-      if (seg.text) div.createSpan({ text: seg.text });
-    }
+    renderBars(plugin, div, line.segments, offset, useFlats);
     return;
   }
   for (const seg of line.segments) {
     const span = div.createSpan({ cls: "ls-seg" });
     if (seg.chord) renderChord(plugin, span, seg.chord, offset, useFlats);
     else span.createSpan({ cls: "ls-chord" });
-    span.createSpan({ cls: "ls-lyric", text: seg.text || " " });
+    span.createSpan({ cls: "ls-lyric", text: seg.text || " " });
+  }
+}
+
+function renderBars(
+  plugin: LeadsheetPlugin,
+  div: HTMLElement,
+  segments: Segment[],
+  offset: number,
+  useFlats: boolean
+) {
+  div.addClass("ls-barline");
+  for (const token of barTokens(segments)) {
+    if ("pipe" in token) {
+      div.createSpan({ cls: "ls-pipe", text: token.pipe, attr: { "aria-hidden": "true" } });
+      continue;
+    }
+    const bar = div.createSpan({ cls: "ls-bar" });
+    for (const item of token.bar) {
+      if ("chord" in item) renderChord(plugin, bar, item.chord, offset, useFlats);
+      else bar.createSpan({ cls: "ls-mark", text: item.mark });
+    }
   }
 }
 

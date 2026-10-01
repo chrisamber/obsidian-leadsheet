@@ -4,11 +4,28 @@
 
 ### Added
 
+- A refreshed default look that needs no CSS snippet: a title header with
+  metadata pills, labeled toolbar groups with theme-native icons, quieter
+  section labels, and chord-only lines drawn as a measure strip.
+- Choruses get a filled label and a margin bar.
+- A toolbar button for performance mode. Performance mode now also hides the
+  note's properties and inline title and pins the toolbar while scrolling.
+- Setlist songs link to their notes; missing songs can be created with a click,
+  and the position label follows manual scrolling.
+- Theme tokens (`--ls-accent`, `--ls-chord-color`, `--ls-section-color`,
+  `--ls-lyric-size`) for retuning the sheet from a snippet.
 - Performance mode keeps the screen awake on supported platforms and safely
   falls back when Screen Wake Lock is unavailable.
 
 ### Changed
 
+- The capo chip is hidden when the capo is 0.
+- The Sounding/Shapes button is now a **Shapes** toggle with a stable label;
+  off shows sounding pitch.
+- Toolbar toggles (play, Shapes, alignment, diagrams, performance mode) expose
+  `aria-pressed`, and control groups are labeled for screen readers.
+- Per-block listeners are released when Obsidian re-renders a block instead of
+  accumulating until the plugin unloads.
 - Mobile toolbar and setlist navigation controls now use touch-sized targets
   and remain reachable during performance.
 - Chord diagram popovers stay inside the viewport and close on outside tap.

@@ -1,22 +1,43 @@
-.leadsheet .ls-toolbar {
+/* Leadsheet styles. Colors come from the active theme; override these tokens
+   from a CSS snippet (on body or .leadsheet) to retune without fighting
+   selectors:
+     --ls-accent         chords, section labels, active controls
+     --ls-chord-color    chord names (defaults to --ls-accent)
+     --ls-section-color  section labels (defaults to --ls-accent)
+     --ls-lyric-size     base lyric size before the A−/A+ scale (1.15em) */
+
+.leadsheet {
+  --_ls-accent: var(--ls-accent, var(--text-accent));
+  --_ls-chord: var(--ls-chord-color, var(--_ls-accent));
+  --_ls-section: var(--ls-section-color, var(--_ls-accent));
+  --_ls-rule: var(--background-modifier-border);
+  --_ls-surface: var(--background-secondary);
+}
+
+/* --- header: title, artist, metadata chips --- */
+
+.leadsheet .ls-header {
   display: flex;
-  align-items: center;
-  gap: 0.8em;
   flex-wrap: wrap;
-  padding-bottom: 0.4em;
-  margin-bottom: 0.6em;
-  border-bottom: 1px solid var(--background-modifier-border);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6em 1.5em;
+  margin-bottom: 0.8em;
 }
 
 .leadsheet .ls-titlebox {
   display: flex;
   flex-direction: column;
-  margin-right: auto;
+  gap: 0.2em;
+  min-width: 0;
 }
 
 .leadsheet .ls-title {
+  font-size: 1.6em;
   font-weight: 700;
-  font-size: 1.1em;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--text-normal);
 }
 
 .leadsheet .ls-meta {
@@ -24,57 +45,30 @@
   font-size: 0.85em;
 }
 
-.leadsheet .ls-controls {
+.leadsheet .ls-artist {
+  font-size: 0.95em;
+}
+
+.leadsheet .ls-chips {
   display: flex;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 0.4em;
 }
 
-.leadsheet .ls-controls button {
-  padding: 2px 8px;
-  font-size: 0.85em;
-  line-height: 1.4;
-}
-
-.leadsheet .ls-controls button.ls-active {
-  color: var(--text-accent);
-  font-weight: 700;
-}
-
-/* Section headers, music-chart styling: a note glyph, small-caps tracking,
-   and a staff-line rule trailing off to the right. */
-.leadsheet .ls-section {
-  display: flex;
-  align-items: center;
-  gap: 0.55em;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--text-accent);
-  margin: 1.1em 0 0.4em;
-}
-.leadsheet .ls-section::before {
-  content: "\266A"; /* ♪ */
-  font-size: 1.15em;
-  line-height: 1;
-  transform: translateY(-0.05em);
-}
-.leadsheet .ls-section::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--background-modifier-border);
-}
-body.leadsheet-align-center .leadsheet .ls-section {
-  justify-content: center;
-}
-body.leadsheet-align-center .leadsheet .ls-section::after {
-  display: none;
-}
-
-/* Metadata icon chips (Key / Capo / Tempo / Time / Duration). */
 .leadsheet .ls-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.32em;
+  gap: 0.35em;
+  padding: 0.2em 0.65em;
+  border: 1px solid var(--_ls-rule);
+  border-radius: 999px;
+  background: var(--_ls-surface);
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.leadsheet .ls-chip[hidden] {
+  display: none;
 }
 .leadsheet .ls-chip-icon {
   display: inline-flex;
@@ -82,28 +76,203 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
 .leadsheet .ls-chip-icon svg {
   width: 0.95em;
   height: 0.95em;
-  color: var(--text-accent);
+  color: var(--_ls-accent);
+}
+.leadsheet .ls-chip.ls-warn .ls-chip-icon svg {
+  color: inherit;
 }
 
-/* Live scroll-speed readout between ▾ / ▴. */
-.leadsheet .ls-speed {
-  align-self: center;
-  min-width: 2.4em;
-  padding: 0 0.3em;
-  text-align: center;
+/* --- toolbar: labeled segmented controls --- */
+
+.leadsheet .ls-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em 0.6em;
+  padding-bottom: 0.8em;
+  margin-bottom: 1.1em;
+  border-bottom: 1px solid var(--_ls-rule);
+  font-size: var(--font-ui-small, 13px);
+}
+
+.leadsheet .ls-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--_ls-rule);
+  border-radius: var(--radius-m, 8px);
+  background: var(--_ls-surface);
+}
+
+.leadsheet .ls-group-label {
+  padding: 0 0.45em 0 0.55em;
   font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  user-select: none;
+}
+
+.leadsheet .ls-controls button,
+.leadsheet button.ls-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 26px;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-s, 5px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.leadsheet .ls-controls button:hover,
+.leadsheet button.ls-mode:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.leadsheet .ls-controls button:focus-visible,
+.leadsheet button.ls-mode:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+.leadsheet .ls-controls button svg {
+  width: 16px;
+  height: 16px;
+}
+.leadsheet .ls-controls button.ls-active {
+  background: var(--background-modifier-active-hover);
+  color: var(--_ls-accent);
+}
+
+/* Sounding/Shapes sits at the end of the transpose group, set off by a hairline. */
+.leadsheet button.ls-mode {
+  position: relative;
+  margin-left: 5px;
+  padding: 0 8px;
+  color: var(--text-normal);
+}
+.leadsheet button.ls-mode::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 5px;
+  bottom: 5px;
+  border-left: 1px solid var(--_ls-rule);
+}
+
+.leadsheet .ls-controls button.ls-offset {
+  min-width: 2.4em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.leadsheet .ls-controls button.ls-play,
+.leadsheet .ls-controls button.ls-play:hover {
+  background: var(--ls-accent, var(--interactive-accent));
+  color: var(--text-on-accent);
+}
+.leadsheet .ls-controls button.ls-play:hover {
+  filter: brightness(1.1);
+}
+
+/* Live scroll-speed readout beside the scroll controls. */
+.leadsheet .ls-speed {
+  min-width: 2.4em;
+  padding: 0 0.4em 0 0.2em;
+  text-align: center;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
+/* --- sheet body --- */
+
+/* Font scale — driven by --ls-font-scale on <body> (default 1). */
+.leadsheet .ls-body {
+  font-size: calc(var(--ls-lyric-size, 1.15em) * var(--ls-font-scale, 1));
+}
+
+.leadsheet .ls-block + .ls-block {
+  margin-top: 1.3em;
+}
+.leadsheet .ls-block:not([data-section]) .ls-lines:empty {
+  display: none;
+}
+
+/* Section labels: a quiet pill and a rule, sized below the lyrics so the
+   words stay the loudest thing on the page. */
+.leadsheet .ls-section {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  margin: 0 0 0.6em;
+  font-size: 0.68em;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--_ls-section);
+}
+.leadsheet .ls-section::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--_ls-rule);
+}
+.leadsheet .ls-section-label {
+  padding: 0.4em 0.75em;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+}
+.leadsheet .ls-block[data-section="chorus"] .ls-section-label {
+  background: var(--_ls-section);
+  color: var(--background-primary);
+}
+
+/* Choruses carry a margin bar, the usual chart cue for "this is the hook". */
+.leadsheet .ls-block[data-section="chorus"] .ls-lines {
+  padding-left: 0.85em;
+  border-left: 2px solid var(--_ls-section);
+}
+
+/* Accent tints where color-mix() exists (Chromium 111+, Safari 16.2+). Older
+   installers keep the neutral fallbacks above: a var() inside color-mix()
+   would otherwise fail at computed-value time instead of falling back. */
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .leadsheet .ls-controls button.ls-active:not(.ls-play) {
+    background: color-mix(in srgb, var(--_ls-accent) 14%, transparent);
+  }
+  .leadsheet .ls-section-label {
+    background: color-mix(in srgb, var(--_ls-section) 14%, transparent);
+  }
+  .leadsheet .ls-block[data-section="chorus"] .ls-lines {
+    border-left-color: color-mix(in srgb, var(--_ls-section) 55%, transparent);
+  }
+}
+
 .leadsheet .ls-gap {
-  height: 0.8em;
+  height: 0.7em;
+}
+.leadsheet .ls-lines > .ls-gap:last-child {
+  display: none;
 }
 
 .leadsheet .ls-line {
-  margin: 0.1em 0;
+  margin: 0;
   white-space: pre-wrap;
-  line-height: 1.35;
+  line-height: 1.3;
+}
+.leadsheet .ls-line + .ls-line {
+  margin-top: 0.55em;
+}
+.leadsheet .ls-lyric-only + .ls-lyric-only {
+  margin-top: 0.15em;
 }
 
 .leadsheet .ls-seg {
@@ -114,12 +283,58 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
 
 .leadsheet .ls-chord {
   display: block;
-  min-height: 1.3em;
+  min-height: 1.25em;
+  padding-right: 0.4em;
+  font-size: 0.8em;
   font-weight: 600;
-  font-size: 0.85em;
-  color: var(--text-accent);
-  padding-right: 0.35em;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--_ls-chord);
 }
+
+.leadsheet .ls-lyric {
+  display: block;
+}
+
+/* Chord-only lines render as a measure strip: | G | G7 | C G | D | */
+.leadsheet .ls-barline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.3em 0.5em;
+  border-radius: var(--radius-s, 5px);
+  background: var(--_ls-surface);
+  white-space: normal;
+}
+.leadsheet .ls-bar {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.8em;
+  min-width: 3.4em;
+  padding: 0.1em 0.75em;
+}
+.leadsheet .ls-barline .ls-chord {
+  display: inline;
+  min-height: 0;
+  padding-right: 0;
+  font-size: 0.9em;
+}
+.leadsheet .ls-pipe {
+  color: var(--text-faint);
+  font-weight: 300;
+  font-size: 1.15em;
+  line-height: 1;
+  letter-spacing: -0.08em;
+  user-select: none;
+}
+.leadsheet .ls-mark {
+  color: var(--text-faint);
+}
+
+/* --- chord popovers --- */
 
 .leadsheet button.ls-chord-trigger:not(.clickable-icon):not(.mod-cta):not(.mod-warning) {
   position: relative;
@@ -155,7 +370,7 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
   z-index: var(--layer-popover, 30);
   display: none;
   padding: 0.45em;
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--_ls-rule);
   border-radius: var(--radius-m, 8px);
   background: var(--background-primary);
   box-shadow: var(--shadow-l, 0 8px 24px rgb(0 0 0 / 18%));
@@ -183,45 +398,13 @@ body.leadsheet-align-center .leadsheet .ls-section::after {
   color: var(--text-normal);
 }
 
-.leadsheet .ls-barline {
-  color: var(--text-faint);
-}
-
-.leadsheet .ls-barline .ls-chord {
-  display: inline;
-  min-height: 0;
-  padding-right: 0;
-}
-
-.leadsheet .ls-lyric {
-  display: block;
-}
-
-/* Font scale — driven by --ls-font-scale on <body> (default 1). */
-.leadsheet .ls-body {
-  font-size: calc(1em * var(--ls-font-scale, 1));
-}
-
-/* Alignment — driven by body.leadsheet-align-center (default left). */
-body.leadsheet-align-center .leadsheet .ls-body,
-body.leadsheet-align-center .leadsheet .ls-section {
-  text-align: center;
-}
-
-/* Performance mode: hide app chrome for music-stand use. */
-body.leadsheet-perf .app-container .workspace-ribbon,
-body.leadsheet-perf .app-container .workspace-split.mod-left-split,
-body.leadsheet-perf .app-container .workspace-split.mod-right-split,
-body.leadsheet-perf .app-container .status-bar,
-body.leadsheet-perf .app-container .view-header {
-  display: none;
-}
+/* --- chord diagram strip --- */
 
 .leadsheet .ls-diagrams {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3em 0.7em;
-  margin-bottom: 0.6em;
+  gap: 0.5em;
+  margin-bottom: 1.1em;
 }
 .leadsheet .ls-diagrams:empty {
   display: none;
@@ -231,8 +414,16 @@ body.leadsheet-perf .app-container .view-header {
   height: 70px;
   color: var(--text-muted);
 }
+.leadsheet .ls-diagrams .ls-diagram {
+  width: 76px;
+  height: 89px;
+  padding: 6px 6px 2px;
+  border: 1px solid var(--_ls-rule);
+  border-radius: var(--radius-m, 8px);
+  background: var(--_ls-surface);
+}
 .leadsheet .ls-diagram .ls-diagram-name {
-  fill: var(--text-accent);
+  fill: var(--_ls-chord);
   font-weight: 600;
 }
 
@@ -240,48 +431,195 @@ body.leadsheet-perf .app-container .view-header {
   color: var(--text-error);
   font-weight: 600;
 }
-.leadsheet .ls-mode {
-  font-size: 0.85em;
-  padding: 2px 8px;
-}
 
 .ls-invalid-chord {
   border-bottom: 2px dotted var(--text-error);
 }
 
+/* --- alignment: driven by body.leadsheet-align-center (default left) --- */
+
+body.leadsheet-align-center .leadsheet .ls-body {
+  text-align: center;
+}
+body.leadsheet-align-center .leadsheet .ls-section {
+  justify-content: center;
+}
+body.leadsheet-align-center .leadsheet .ls-section::after {
+  display: none;
+}
+body.leadsheet-align-center .leadsheet .ls-block[data-section="chorus"] .ls-lines {
+  padding-left: 0;
+  border-left: 0;
+}
+body.leadsheet-align-center .leadsheet .ls-barline {
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- performance mode: hide app chrome and note metadata for the stand --- */
+
+body.leadsheet-perf .app-container .workspace-ribbon,
+body.leadsheet-perf .app-container .workspace-split.mod-left-split,
+body.leadsheet-perf .app-container .workspace-split.mod-right-split,
+body.leadsheet-perf .app-container .status-bar,
+body.leadsheet-perf .app-container .view-header,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .metadata-container,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .inline-title,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .embedded-backlinks {
+  display: none;
+}
+
+/* Keep the controls in reach while the sheet scrolls under them. Sticky
+   offsets start inside the scroller's padding, so drop the top padding to
+   let the toolbar pin flush instead of leaving a strip of lyrics above it. */
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .cm-scroller {
+  padding-top: 0;
+}
+body.leadsheet-perf .leadsheet:not(.ls-nested) > .ls-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-top: 0.6em;
+  background: var(--background-primary);
+}
+
+/* --- set lists --- */
+
 .leadsheet-setlist .ls-setlist-nav {
   position: sticky;
   top: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 0;
+  gap: 0.75em;
+  padding: 0.6em 0;
+  border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
-  z-index: 1;
+}
+.leadsheet-setlist .ls-setlist-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  min-width: 0;
+  margin-right: auto;
 }
 .leadsheet-setlist .ls-setlist-pos {
-  margin-left: auto;
-  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  min-width: 0;
+  font-weight: 600;
+}
+.leadsheet-setlist .ls-setlist-count {
+  color: var(--ls-accent, var(--text-accent));
+  font-variant-numeric: tabular-nums;
+}
+.leadsheet-setlist .ls-setlist-current {
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 45%;
+  white-space: nowrap;
 }
+.leadsheet-setlist .ls-setlist-summary {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+.leadsheet-setlist .ls-controls {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-secondary);
+}
+.leadsheet-setlist .ls-setlist-nav .ls-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-s, 5px);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.leadsheet-setlist .ls-setlist-nav .ls-controls button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .leadsheet-setlist .ls-setlist-song {
-  margin: 1.2em 0;
-  padding-top: 0.4em;
-  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 2.2em;
+  scroll-margin-top: 4.5em;
 }
+.leadsheet-setlist .ls-setlist-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 1em;
+  font-size: 0.85em;
+}
+.leadsheet-setlist .ls-setlist-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+.leadsheet-setlist .ls-setlist-num {
+  color: var(--text-faint);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.leadsheet-setlist .ls-setlist-link {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--background-modifier-border);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.leadsheet-setlist .ls-setlist-link:hover {
+  color: var(--text-accent);
+  text-decoration-color: currentColor;
+}
+.leadsheet-setlist .ls-setlist-link:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.leadsheet-setlist .ls-setlist-link.is-unresolved {
+  color: var(--text-error);
+}
+.leadsheet-setlist .ls-setlist-missing {
+  padding: 0.8em 1em 0.1em;
+  border: 1px dashed var(--text-error);
+  border-radius: var(--radius-m, 8px);
+}
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .leadsheet-setlist .ls-setlist-missing {
+    border-color: color-mix(in srgb, var(--text-error) 55%, transparent);
+  }
+}
+.leadsheet-setlist .ls-setlist-note {
+  color: var(--text-muted);
+}
+.leadsheet-setlist .ls-warn {
+  color: var(--text-error);
+}
+
+/* --- touch widths --- */
 
 @media (max-width: 600px) {
-  .leadsheet .ls-toolbar {
-    align-items: stretch;
-    gap: 0.4em;
+  .leadsheet .ls-header {
+    align-items: flex-start;
   }
 
-  .leadsheet .ls-titlebox {
-    flex-basis: 100%;
-    min-width: 0;
+  .leadsheet .ls-toolbar {
+    gap: 0.4em;
   }
 
   .leadsheet .ls-controls {
@@ -289,9 +627,13 @@ body.leadsheet-perf .app-container .view-header {
     max-width: 100%;
   }
 
+  .leadsheet .ls-group-label {
+    display: none;
+  }
+
   .leadsheet .ls-controls button,
   .leadsheet button.ls-mode,
-  .leadsheet-setlist .ls-setlist-nav button {
+  .leadsheet-setlist .ls-setlist-nav .ls-controls button {
     min-width: 44px;
     min-height: 44px;
     padding: 8px;
@@ -311,11 +653,7 @@ body.leadsheet-perf .app-container .view-header {
     background: var(--background-primary);
   }
 
-  .leadsheet-setlist .ls-setlist-nav {
-    z-index: 3;
-  }
-
   body.leadsheet-perf .leadsheet-setlist .leadsheet .ls-toolbar {
-    top: 52px;
+    top: 66px;
   }
 }

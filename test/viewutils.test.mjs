@@ -5,7 +5,10 @@ import {
   scrollSpeedForDuration,
   chordPopoverPlacement,
   shouldHoldWakeLock,
+  sectionKind,
+  barTokens,
 } from "../viewutils.mjs";
+import { parse } from "../parser.mjs";
 
 test("clampCapo clamps and flags bad values", () => {
   assert.deepEqual(clampCapo("2"), { capo: 2, bad: false });
@@ -58,4 +61,61 @@ test("shouldHoldWakeLock requires performance mode, visibility, and support", ()
   assert.equal(shouldHoldWakeLock(false, "visible", true), false);
   assert.equal(shouldHoldWakeLock(true, "hidden", true), false);
   assert.equal(shouldHoldWakeLock(true, "visible", false), false);
+});
+
+test("sectionKind maps common English and CJK labels to roles", () => {
+  assert.equal(sectionKind("Chorus 2"), "chorus");
+  assert.equal(sectionKind("Refrain"), "chorus");
+  assert.equal(sectionKind("副歌"), "chorus");
+  assert.equal(sectionKind("Pre-Chorus"), "prechorus");
+  assert.equal(sectionKind("prechorus"), "prechorus");
+  assert.equal(sectionKind("Verse 1"), "verse");
+  assert.equal(sectionKind("主歌"), "verse");
+  assert.equal(sectionKind("Bridge"), "bridge");
+  assert.equal(sectionKind("Intro"), "instrumental");
+  assert.equal(sectionKind("間奏"), "instrumental");
+  assert.equal(sectionKind("Breakdown"), "other");
+});
+
+const barsOf = (src) => barTokens(parse(src).lines[0].segments);
+
+test("barTokens groups chords into measures between pipes", () => {
+  assert.deepEqual(barsOf("| [G] | [G7] | [C] [G] | [D] |"), [
+    { pipe: "|" },
+    { bar: [{ chord: "G" }] },
+    { pipe: "|" },
+    { bar: [{ chord: "G7" }] },
+    { pipe: "|" },
+    { bar: [{ chord: "C" }, { chord: "G" }] },
+    { pipe: "|" },
+    { bar: [{ chord: "D" }] },
+    { pipe: "|" },
+  ]);
+});
+
+test("barTokens keeps lines without pipes as one measure", () => {
+  assert.deepEqual(barsOf("[C] [G/B]"), [{ bar: [{ chord: "C" }, { chord: "G/B" }] }]);
+});
+
+test("barTokens reads repeat signs, double bars, and beat marks", () => {
+  assert.deepEqual(barsOf("|: [Am] . [F] :|| [C] |"), [
+    { pipe: "|:" },
+    { bar: [{ chord: "Am" }, { mark: "." }, { chord: "F" }] },
+    { pipe: ":||" },
+    { bar: [{ chord: "C" }] },
+    { pipe: "|" },
+  ]);
+  // Spaced pipes are two bar lines around an empty (dropped) measure.
+  assert.deepEqual(barsOf("[C] | | [G]"), [
+    { bar: [{ chord: "C" }] },
+    { pipe: "|" },
+    { pipe: "|" },
+    { bar: [{ chord: "G" }] },
+  ]);
+  // A stray colon inside a measure is kept as a mark.
+  assert.deepEqual(barsOf("| [C] : [G] |"), [
+    { pipe: "|" },
+    { bar: [{ chord: "C" }, { mark: ":" }, { chord: "G" }] },
+    { pipe: "|" },
+  ]);
 });
