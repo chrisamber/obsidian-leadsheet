@@ -84,7 +84,7 @@ Unknown extra fields are allowed and ignored by the plugin.
   Choruses get a filled label and a margin bar.
 - Header: title/artist plus metadata pills — current key (updates with
   transpose), capo (hidden at 0), tempo, time, duration.
-- Toolbar: labeled groups for transpose − / reset / + (with Sounding/Shapes
+- Toolbar: labeled groups for transpose − / reset / + (with a Shapes toggle
   when a capo is set), autoscroll speed and ▶/⏸, text size, and toggles for
   alignment, the chord-diagram strip, and performance mode. Icons come from
   Obsidian's Lucide set with text fallbacks.

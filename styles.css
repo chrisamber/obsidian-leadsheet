@@ -12,7 +12,6 @@
   --_ls-section: var(--ls-section-color, var(--_ls-accent));
   --_ls-rule: var(--background-modifier-border);
   --_ls-surface: var(--background-secondary);
-  --_ls-tint: color-mix(in srgb, var(--_ls-accent) 14%, transparent);
 }
 
 /* --- header: title, artist, metadata chips --- */
@@ -149,7 +148,7 @@
   height: 16px;
 }
 .leadsheet .ls-controls button.ls-active {
-  background: var(--_ls-tint);
+  background: var(--background-modifier-active-hover);
   color: var(--_ls-accent);
 }
 
@@ -229,7 +228,7 @@
 .leadsheet .ls-section-label {
   padding: 0.4em 0.75em;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--_ls-section) 14%, transparent);
+  background: var(--background-modifier-hover);
 }
 .leadsheet .ls-block[data-section="chorus"] .ls-section-label {
   background: var(--_ls-section);
@@ -239,7 +238,22 @@
 /* Choruses carry a margin bar, the usual chart cue for "this is the hook". */
 .leadsheet .ls-block[data-section="chorus"] .ls-lines {
   padding-left: 0.85em;
-  border-left: 2px solid color-mix(in srgb, var(--_ls-section) 55%, transparent);
+  border-left: 2px solid var(--_ls-section);
+}
+
+/* Accent tints where color-mix() exists (Chromium 111+, Safari 16.2+). Older
+   installers keep the neutral fallbacks above: a var() inside color-mix()
+   would otherwise fail at computed-value time instead of falling back. */
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .leadsheet .ls-controls button.ls-active:not(.ls-play) {
+    background: color-mix(in srgb, var(--_ls-accent) 14%, transparent);
+  }
+  .leadsheet .ls-section-label {
+    background: color-mix(in srgb, var(--_ls-section) 14%, transparent);
+  }
+  .leadsheet .ls-block[data-section="chorus"] .ls-lines {
+    border-left-color: color-mix(in srgb, var(--_ls-section) 55%, transparent);
+  }
 }
 
 .leadsheet .ls-gap {
@@ -272,7 +286,7 @@
   min-height: 1.25em;
   padding-right: 0.4em;
   font-size: 0.8em;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
@@ -450,20 +464,20 @@ body.leadsheet-perf .app-container .workspace-split.mod-left-split,
 body.leadsheet-perf .app-container .workspace-split.mod-right-split,
 body.leadsheet-perf .app-container .status-bar,
 body.leadsheet-perf .app-container .view-header,
-body.leadsheet-perf .workspace-leaf-content:has(.leadsheet) .metadata-container,
-body.leadsheet-perf .workspace-leaf-content:has(.leadsheet) .inline-title,
-body.leadsheet-perf .workspace-leaf-content:has(.leadsheet) .embedded-backlinks {
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .metadata-container,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .inline-title,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .embedded-backlinks {
   display: none;
 }
 
 /* Keep the controls in reach while the sheet scrolls under them. Sticky
    offsets start inside the scroller's padding, so drop the top padding to
    let the toolbar pin flush instead of leaving a strip of lyrics above it. */
-body.leadsheet-perf .workspace-leaf-content:has(.leadsheet) .markdown-preview-view,
-body.leadsheet-perf .workspace-leaf-content:has(.leadsheet) .cm-scroller {
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .markdown-preview-view,
+body.leadsheet-perf .workspace-leaf-content[data-type="markdown"] .cm-scroller {
   padding-top: 0;
 }
-body.leadsheet-perf .leadsheet:not(.ls-setlist-song > .leadsheet) > .ls-toolbar {
+body.leadsheet-perf .leadsheet:not(.ls-nested) > .ls-toolbar {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -561,16 +575,34 @@ body.leadsheet-perf .leadsheet:not(.ls-setlist-song > .leadsheet) > .ls-toolbar 
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
 }
-.leadsheet-setlist .ls-setlist-divider .internal-link {
+.leadsheet-setlist .ls-setlist-link {
   color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--background-modifier-border);
+  text-underline-offset: 0.2em;
+  cursor: pointer;
 }
-.leadsheet-setlist .ls-setlist-divider .internal-link.is-unresolved {
+.leadsheet-setlist .ls-setlist-link:hover {
+  color: var(--text-accent);
+  text-decoration-color: currentColor;
+}
+.leadsheet-setlist .ls-setlist-link:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.leadsheet-setlist .ls-setlist-link.is-unresolved {
   color: var(--text-error);
 }
 .leadsheet-setlist .ls-setlist-missing {
   padding: 0.8em 1em 0.1em;
-  border: 1px dashed color-mix(in srgb, var(--text-error) 55%, transparent);
+  border: 1px dashed var(--text-error);
   border-radius: var(--radius-m, 8px);
+}
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .leadsheet-setlist .ls-setlist-missing {
+    border-color: color-mix(in srgb, var(--text-error) 55%, transparent);
+  }
 }
 .leadsheet-setlist .ls-setlist-note {
   color: var(--text-muted);

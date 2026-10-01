@@ -330,7 +330,7 @@ function renderLeadsheet(
   el.addClass("leadsheet");
 
   const header = el.createDiv({ cls: "ls-header" });
-  const toolbar = el.createDiv({ cls: "ls-toolbar", attr: { role: "toolbar", "aria-label": "Leadsheet controls" } });
+  const toolbar = el.createDiv({ cls: "ls-toolbar", attr: { role: "group", "aria-label": "Leadsheet controls" } });
   const diagrams = el.createDiv({ cls: "ls-diagrams" });
   const body = el.createDiv({ cls: "ls-body" });
   const chordList = uniqueChords(song);
@@ -379,11 +379,13 @@ function renderLeadsheet(
 
   // --- capo shape toggle (only meaningful when a capo is set) ---
   if (capo > 0) {
+    // A stable label with a pressed state: off shows sounding pitch.
     const modeBtn = tr.createEl("button", {
       cls: "ls-mode",
-      attr: { type: "button", "aria-label": "Show sounding pitch or capo shapes" },
+      text: "Shapes",
+      attr: { type: "button", "aria-label": `Show capo shapes (capo ${capo})` },
     });
-    const syncMode = () => (modeBtn.textContent = plugin.settings.chordMode === "shapes" ? "Shapes" : "Sounding");
+    const syncMode = () => pressed(modeBtn, plugin.settings.chordMode === "shapes");
     syncMode();
     modeBtn.onclick = async () => {
       plugin.settings.chordMode = plugin.settings.chordMode === "shapes" ? "sounding" : "shapes";
@@ -436,11 +438,11 @@ function renderLeadsheet(
 
   // --- view toggles: alignment, diagram strip, performance mode ---
   const view = controlGroup(toolbar, null, "View");
-  const alignBtn = iconButton(view, "align-left", "Toggle alignment", "Left");
+  const alignBtn = iconButton(view, "align-left", "Center the sheet", "Left");
   const syncAlign = () => {
     const center = plugin.settings.align === "center";
     setButtonIcon(alignBtn, center ? "align-center" : "align-left", center ? "Center" : "Left");
-    alignBtn.setAttr("aria-label", center ? "Alignment: center" : "Alignment: left");
+    pressed(alignBtn, center);
   };
   syncAlign();
   alignBtn.onclick = async () => {
@@ -543,15 +545,22 @@ function renderSetlist(
     anchors.push(songEl);
     const divider = songEl.createDiv({ cls: "ls-setlist-divider" });
     divider.createSpan({ cls: "ls-setlist-num", text: String(i + 1).padStart(2, "0") });
-    // Clicking opens the song; an unresolved link offers to create it.
-    const link = divider.createEl("a", {
-      cls: dest ? "internal-link" : "internal-link is-unresolved",
+    // Clicking opens the song; an unresolved link offers to create it. A span
+    // rather than an <a href> / .internal-link, so Obsidian's own link handler
+    // does not navigate a second time (a known crash path on Android).
+    const link = divider.createSpan({
+      cls: dest ? "ls-setlist-link" : "ls-setlist-link is-unresolved",
       text: name,
-      attr: { href: name, "data-href": name },
+      attr: { role: "link", tabindex: "0" },
     });
-    link.addEventListener("click", (event) => {
+    const open = (event: MouseEvent | KeyboardEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       void plugin.app.workspace.openLinkText(name, sourcePath, Keymap.isModEvent(event));
+    };
+    link.addEventListener("click", open);
+    link.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") open(event);
     });
     if (!dest) {
       missing++;
@@ -567,7 +576,7 @@ function renderSetlist(
           updateSummary();
         }
         const m = text.match(SONG_BLOCK_RE);
-        if (m) renderLeadsheet(plugin, owner, m[1], songEl.createDiv(), dest.path);
+        if (m) renderLeadsheet(plugin, owner, m[1], songEl.createDiv({ cls: "ls-nested" }), dest.path);
         else songEl.createDiv({ cls: "ls-meta", text: "No leadsheet block in this note." });
       })
       .catch(() => songEl.createDiv({ cls: "ls-meta ls-warn", text: "Failed to read song." }));

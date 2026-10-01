@@ -14,15 +14,16 @@
   and the position label follows manual scrolling.
 - Theme tokens (`--ls-accent`, `--ls-chord-color`, `--ls-section-color`,
   `--ls-lyric-size`) for retuning the sheet from a snippet.
-
 - Performance mode keeps the screen awake on supported platforms and safely
   falls back when Screen Wake Lock is unavailable.
 
 ### Changed
 
 - The capo chip is hidden when the capo is 0.
-- Toolbar toggles expose `aria-pressed`, and control groups are labeled for
-  screen readers.
+- The Sounding/Shapes button is now a **Shapes** toggle with a stable label;
+  off shows sounding pitch.
+- Toolbar toggles (play, Shapes, alignment, diagrams, performance mode) expose
+  `aria-pressed`, and control groups are labeled for screen readers.
 - Per-block listeners are released when Obsidian re-renders a block instead of
   accumulating until the plugin unloads.
 - Mobile toolbar and setlist navigation controls now use touch-sized targets

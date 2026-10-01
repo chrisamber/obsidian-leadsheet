@@ -64,8 +64,8 @@ The toolbar groups related controls:
 
 - **Transpose − / 0 / +** — transpose down/reset/up. The offset is remembered
   per file. The key chip updates; flats vs sharps follow the target key
-  signature. With a `capo:` set, **Sounding / Shapes** at the end of the group
-  toggles between concert pitch and the shapes your hands play. Bad capo values
+  signature. With a `capo:` set, **Shapes** at the end of the group switches
+  from concert (sounding) pitch to the shapes your hands play. Bad capo values
   (outside 0–11) are flagged and clamped.
 - **Scroll ⌄ ▶ ⌃** — autoscroll the note (also the hotkeyable command
   *Leadsheet: Toggle autoscroll*). The chevrons adjust speed (px/s, shown
@@ -76,10 +76,9 @@ The toolbar groups related controls:
 - **Alignment** — switch the sheet between left and centered (global).
 - **Chord diagrams** — show/hide guitar chord diagrams for every chord used in
   the song (standard tuning). Diagrams follow the current transpose offset and
-  the Sounding/Shapes capo mode, so in Shapes mode they show the grips you
-  actually play. Unrecognized chords (e.g. `N.C.`) are skipped.
-- **Performance mode** — hides the app chrome and the note's properties and
-  title, pins the toolbar while the sheet scrolls, and keeps the screen awake
+  the Shapes toggle, so with Shapes on they show the grips you actually play. Unrecognized chords (e.g. `N.C.`) are skipped.
+- **Performance mode** — hides the app chrome and note properties and titles,
+  pins the toolbar while the sheet scrolls, and keeps the screen awake
   when the platform supports Screen Wake Lock. Also available as *Leadsheet:
   Toggle performance mode*.
 - **Chord popovers** — hover, keyboard-focus, or tap a recognized chord to see
