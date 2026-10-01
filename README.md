@@ -60,33 +60,42 @@ You can also copy this starter template directly:
 ```
 ````
 
-The toolbar gives you:
+The toolbar groups related controls:
 
-- **− / +2 / +** — transpose down/reset/up. The offset is remembered per file.
-  The displayed key updates; flats vs sharps follow the target key signature.
-- **▶ / ⏸** — autoscroll the note (also the hotkeyable command *Leadsheet:
-  Toggle autoscroll*). **▾ / ▴** adjust speed (px/s, in settings too). If the
-  song's frontmatter has `duration:` (seconds), ▶ paces the whole sheet over
-  that time. Tap the sheet body to pause.
-- **A− / A+** — grow/shrink the leadsheet font (global). *Leadsheet: Toggle
-  performance mode* hides the app chrome, keeps essential controls reachable
-  on mobile, and keeps the screen awake when the platform supports Screen Wake
-  Lock.
-- **Center / Left** — switch the sheet alignment globally.
-- **Sounding / Shapes** — with a `capo:` set, toggle between concert pitch and
-  the shapes your hands play. Bad capo values (outside 0–11) are flagged and
-  clamped.
+- **Transpose − / 0 / +** — transpose down/reset/up. The offset is remembered
+  per file. The key chip updates; flats vs sharps follow the target key
+  signature. With a `capo:` set, **Sounding / Shapes** at the end of the group
+  toggles between concert pitch and the shapes your hands play. Bad capo values
+  (outside 0–11) are flagged and clamped.
+- **Scroll ⌄ ▶ ⌃** — autoscroll the note (also the hotkeyable command
+  *Leadsheet: Toggle autoscroll*). The chevrons adjust speed (px/s, shown
+  beside them and in settings). If the song's frontmatter has `duration:`
+  (seconds), ▶ paces the whole sheet over that time. Tap the sheet body to
+  pause.
+- **Text size** — shrink/grow the leadsheet font (global).
+- **Alignment** — switch the sheet between left and centered (global).
+- **Chord diagrams** — show/hide guitar chord diagrams for every chord used in
+  the song (standard tuning). Diagrams follow the current transpose offset and
+  the Sounding/Shapes capo mode, so in Shapes mode they show the grips you
+  actually play. Unrecognized chords (e.g. `N.C.`) are skipped.
+- **Performance mode** — hides the app chrome and the note's properties and
+  title, pins the toolbar while the sheet scrolls, and keeps the screen awake
+  when the platform supports Screen Wake Lock. Also available as *Leadsheet:
+  Toggle performance mode*.
 - **Chord popovers** — hover, keyboard-focus, or tap a recognized chord to see
   its current fingering without showing the full diagram strip.
-- **▦** — show/hide guitar chord diagrams for every chord used in the song
-  (standard tuning). Diagrams follow the current transpose offset and the
-  Sounding/Shapes capo mode, so in Shapes mode they show the grips you
-  actually play. Unrecognized chords (e.g. `N.C.`) are skipped.
+
+Choruses (`{Chorus}`, `{Refrain}`, `{副歌}`) get a filled label and a margin
+bar so the hook is easy to find mid-song, and chord-only lines such as
+`| [G] | [G7] | [C] [G] | [D] |` render as a measure strip.
 
 ## Set lists
 
 A `setlist` code block renders several songs as one continuous, scrollable view
-with Prev/Next navigation:
+with Prev/Next navigation. The header shows the song count, total known
+duration, and missing songs, and its position label follows you as you scroll.
+Each song's name links to its note; a missing note is flagged and can be
+created with a click.
 
 ````markdown
 ```setlist
@@ -105,6 +114,21 @@ with Prev/Next navigation:
 - Invalid chord tokens are marked in the editor.
 
 See [SPEC.md](SPEC.md) for the full schema.
+
+## Styling
+
+Leadsheet follows your theme's colors and fonts. To retune it without
+overriding selectors, set these variables in a
+[CSS snippet](https://help.obsidian.md/snippets):
+
+```css
+body {
+  --ls-accent: #6b57e0;        /* chords, section labels, active controls */
+  --ls-chord-color: #6b57e0;   /* chord names (defaults to --ls-accent) */
+  --ls-section-color: #6b57e0; /* section labels (defaults to --ls-accent) */
+  --ls-lyric-size: 1.3em;      /* base lyric size before the text-size buttons */
+}
+```
 
 ## Install
 
