@@ -29,6 +29,9 @@
 - Mobile toolbar and setlist navigation controls now use touch-sized targets
   and remain reachable during performance.
 - Chord diagram popovers stay inside the viewport and close on outside tap.
+- The README has a centered hero, a feature grid with Lucide icons, and
+  light/dark images for the write → get example, toolbar anatomy, and set
+  lists. The toolbar reference and the BRAT and manual installs are collapsed.
 
 ## 0.6.0 — 2026-07-21
 
