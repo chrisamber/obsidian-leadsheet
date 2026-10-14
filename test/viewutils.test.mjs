@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   clampCapo,
   scrollSpeedForDuration,
+  autoscrollEnd,
   chordPopoverPlacement,
   shouldHoldWakeLock,
   sectionKind,
@@ -21,6 +22,13 @@ test("clampCapo clamps and flags bad values", () => {
 test("scrollSpeedForDuration derives px/s, guards zero", () => {
   assert.equal(scrollSpeedForDuration(2100, 210), 10);
   assert.equal(scrollSpeedForDuration(2100, 0), 0);
+});
+
+test("autoscrollEnd stops where the bound's bottom meets the view's", () => {
+  assert.equal(autoscrollEnd(1000, 50000, 1800), 2800); // song ends 1800px below
+  assert.equal(autoscrollEnd(1000, 50000, -200), 800); // already past its end
+  assert.equal(autoscrollEnd(49000, 50000, 3000), 50000); // never past the scroller
+  assert.equal(autoscrollEnd(100, 50000, -400), 0);
 });
 
 test("chordPopoverPlacement keeps a popover inside horizontal viewport margins", () => {

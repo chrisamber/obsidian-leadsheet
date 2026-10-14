@@ -20,9 +20,12 @@ export function formatDuration(sec: number): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : ms;
 }
 
-export function summaryLabel(total: number, missing: number, knownSec: number): string {
+// Untimed songs are only called out next to a partial total; when no song has
+// a duration there is no total for them to qualify.
+export function summaryLabel(total: number, missing: number, knownSec: number, untimed = 0): string {
   const parts = [`${total} song${total === 1 ? "" : "s"}`];
   if (knownSec > 0) parts.push(formatDuration(knownSec));
+  if (knownSec > 0 && untimed > 0) parts.push(`${untimed} untimed`);
   if (missing > 0) parts.push(`${missing} missing`);
   return parts.join(" · ");
 }
@@ -42,4 +45,14 @@ export function nextIndex(cur: number, len: number): number {
 
 export function prevIndex(cur: number, len: number): number {
   return len ? (cur - 1 + len) % len : 0;
+}
+
+// The current item is the last one whose top has reached the reading line;
+// before any has, it is the first.
+export function currentIndex(tops: number[], line: number): number {
+  let i = 0;
+  tops.forEach((top, j) => {
+    if (top <= line) i = j;
+  });
+  return i;
 }

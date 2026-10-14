@@ -13,6 +13,7 @@ import { parse, Segment, SongLine, transposeKey, isValidChord } from "./parser";
 import {
   clampCapo,
   scrollSpeedForDuration,
+  autoscrollEnd,
   chordPopoverPlacement,
   shouldHoldWakeLock,
   sectionKind,
@@ -28,6 +29,7 @@ import {
   songDurationSec,
   summaryLabel,
   formatDuration,
+  currentIndex,
   SONG_BLOCK_RE,
 } from "./setlist";
 import { ChordShape, chordDiagramData, uniqueChords } from "./diagrams";
@@ -62,6 +64,7 @@ const DEFAULT_SETTINGS: LeadsheetSettings = {
 export default class LeadsheetPlugin extends Plugin {
   settings: LeadsheetSettings = DEFAULT_SETTINGS;
   private scrollEl: HTMLElement | null = null;
+  private scrollSheet: HTMLElement | null = null; // sheet whose play started the scroll
   private scrollRaf = 0;
   private liveSpeed = 0; // px/s of the active scroll; adjustable mid-scroll
   private openChordTrigger: HTMLButtonElement | null = null;
@@ -121,13 +124,7 @@ export default class LeadsheetPlugin extends Plugin {
     this.addCommand({
       id: "toggle-autoscroll",
       name: "Toggle autoscroll",
-      callback: () => {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        const el = view?.containerEl.querySelector(
-          ".markdown-preview-view, .cm-scroller"
-        ) as HTMLElement | null;
-        if (el) this.toggleAutoscroll(el);
-      },
+      callback: () => this.toggleAutoscrollCommand(),
     });
 
     this.addSettingTab(new LeadsheetSettingTab(this.app, this));
@@ -244,28 +241,43 @@ export default class LeadsheetPlugin extends Plugin {
     return this.scrollEl !== null;
   }
 
-  // Duration sets the pace when available; otherwise use the saved speed.
-  toggleAutoscroll(el: HTMLElement, durationSec = 0) {
+  // Duration sets the pace when available; otherwise use the saved speed. A
+  // sheet inside a set list scrolls through its own song only: the pace comes
+  // from that song's height and playback stops at its last line.
+  toggleAutoscroll(el: HTMLElement, durationSec = 0, sheet: HTMLElement | null = null) {
     if (this.scrollEl) {
       this.stopAutoscroll();
       return;
     }
+    const bound = sheet?.closest<HTMLElement>(".ls-setlist-song") ?? null;
     this.scrollEl = el;
+    this.scrollSheet = sheet;
     const win = el.win;
-    const derived = scrollSpeedForDuration(el.scrollHeight - el.clientHeight, durationSec);
+    const contentPx = (bound ? bound.offsetHeight : el.scrollHeight) - el.clientHeight;
+    const derived = scrollSpeedForDuration(contentPx, durationSec);
     this.liveSpeed = derived > 0 ? derived : this.settings.scrollSpeed;
+    // Re-measured every frame: songs above may still be rendering.
+    const end = () => {
+      const max = el.scrollHeight - el.clientHeight;
+      if (!bound) return max;
+      return autoscrollEnd(
+        el.scrollTop,
+        max,
+        bound.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom
+      );
+    };
     let pos = el.scrollTop;
     let lastTs = 0;
     const step = (ts: number) => {
-      if (!this.scrollEl) return;
+      if (this.scrollEl !== el) return;
       if (lastTs) {
-        pos += (this.liveSpeed * (ts - lastTs)) / 1000;
-        this.scrollEl.scrollTop = pos;
-        // stop at the bottom
-        if (pos >= this.scrollEl.scrollHeight - this.scrollEl.clientHeight) {
+        const stop = end();
+        if (pos >= stop) {
           this.stopAutoscroll();
           return;
         }
+        pos = Math.min(pos + (this.liveSpeed * (ts - lastTs)) / 1000, stop);
+        el.scrollTop = pos;
       }
       lastTs = ts;
       this.scrollRaf = win.requestAnimationFrame(step);
@@ -273,11 +285,43 @@ export default class LeadsheetPlugin extends Plugin {
     this.scrollRaf = win.requestAnimationFrame(step);
   }
 
+  // The command plays the sheet at the reading line exactly as its own play
+  // button would (duration pace, set-list bounds). A note without a sheet
+  // scrolls at the saved speed.
+  private toggleAutoscrollCommand() {
+    if (this.scrollEl) {
+      this.stopAutoscroll();
+      return;
+    }
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const scroller = Array.from(
+      view?.containerEl.querySelectorAll<HTMLElement>(".markdown-preview-view, .cm-scroller") ?? []
+    ).find((el) => el.isShown());
+    if (!scroller) return;
+    const plays = Array.from(scroller.querySelectorAll<HTMLButtonElement>(".leadsheet .ls-play"));
+    if (!plays.length) {
+      this.toggleAutoscroll(scroller);
+      return;
+    }
+    // Same reading line and anchors as the set-list position label.
+    const tops = plays.map((play) =>
+      (play.closest(".ls-setlist-song") ?? play.closest(".leadsheet"))!.getBoundingClientRect().top
+    );
+    plays[currentIndex(tops, scroller.win.innerHeight * 0.4)].click();
+  }
+
+  // A sheet that unloads (another file in the leaf, a re-render) takes its
+  // playback with it, so the scroller never keeps running under other content.
+  releaseAutoscroll(sheet: HTMLElement) {
+    if (this.scrollSheet === sheet) this.stopAutoscroll();
+  }
+
   stopAutoscroll() {
     const body = this.scrollEl?.doc.body ?? activeDocument.body;
     if (this.scrollRaf) (this.scrollEl?.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
     this.scrollRaf = 0;
     this.scrollEl = null;
+    this.scrollSheet = null;
     const win = body.doc.defaultView;
     if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
   }
@@ -412,7 +456,7 @@ function renderLeadsheet(
   updateSpeed();
   play.onclick = () => {
     const scrollEl = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
-    if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec);
+    if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec, el);
     updatePlay();
     updateSpeed();
   };
@@ -423,6 +467,7 @@ function renderLeadsheet(
     updateSpeed();
   });
   owner.registerDomEvent(hostBody, "leadsheet-speed-changed", updateSpeed);
+  owner.register(() => plugin.releaseAutoscroll(el));
 
   // --- font size (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
@@ -530,8 +575,9 @@ function renderSetlist(
   // Total duration accumulates as song files resolve; the label stays honest
   // about what is known so far rather than blocking on all reads.
   let knownSec = 0;
+  let untimed = 0;
   const updateSummary = () =>
-    (summary.textContent = summaryLabel(targets.length, missing, knownSec));
+    (summary.textContent = summaryLabel(targets.length, missing, knownSec, untimed));
   const updatePos = () => {
     pos.empty();
     if (!targets.length) return;
@@ -571,10 +617,9 @@ function renderSetlist(
     void plugin.app.vault.cachedRead(dest)
       .then((text: string) => {
         const sec = songDurationSec(text);
-        if (sec) {
-          knownSec += sec;
-          updateSummary();
-        }
+        if (sec) knownSec += sec;
+        else untimed++;
+        updateSummary();
         const m = text.match(SONG_BLOCK_RE);
         if (m) renderLeadsheet(plugin, owner, m[1], songEl.createDiv({ cls: "ls-nested" }), dest.path);
         else songEl.createDiv({ cls: "ls-meta", text: "No leadsheet block in this note." });
@@ -586,15 +631,15 @@ function renderSetlist(
 
   // Follow manual scrolling: the current song is the last one whose top has
   // reached the upper 40% of the view. Paused briefly after Prev/Next so a
-  // short final song that cannot scroll to the top still stays selected.
+  // short final song that cannot scroll to the top still stays selected, and
+  // while hidden (the other view mode), where every top reads as 0.
   let navUntil = 0;
   const observer = new IntersectionObserver(() => {
-    if (Date.now() < navUntil) return;
-    const line = el.win.innerHeight * 0.4;
-    let i = 0;
-    anchors.forEach((a, j) => {
-      if (a.getBoundingClientRect().top <= line) i = j;
-    });
+    if (Date.now() < navUntil || !el.isShown()) return;
+    const i = currentIndex(
+      anchors.map((a) => a.getBoundingClientRect().top),
+      el.win.innerHeight * 0.4
+    );
     if (i !== cur) {
       cur = i;
       updatePos();

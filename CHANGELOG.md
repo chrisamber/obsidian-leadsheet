@@ -4,6 +4,10 @@
 
 ### Added
 
+- Set lists show a summary before you start: song count, total known
+  duration, how many songs have no duration, and how many links are missing.
+- The sticky set-list bar shows the current position (`3/20 · Song`) next to
+  Prev/Next.
 - A refreshed default look that needs no CSS snippet: a title header with
   metadata pills, labeled toolbar groups with theme-native icons, quieter
   section labels, and chord-only lines drawn as a measure strip.
@@ -14,11 +18,19 @@
   and the position label follows manual scrolling.
 - Theme tokens (`--ls-accent`, `--ls-chord-color`, `--ls-section-color`,
   `--ls-lyric-size`) for retuning the sheet from a snippet.
-- Performance mode keeps the screen awake on supported platforms and safely
-  falls back when Screen Wake Lock is unavailable.
 
 ### Changed
 
+- Autoscroll in a set list plays one song: its pace comes from that song's
+  duration and height, and it stops at the song's last line instead of running
+  into the next one. Prev/Next stop playback before moving.
+- **Toggle autoscroll** plays the sheet at the top of the view, with the same
+  duration pacing as its play button. In Reading view it no longer scrolls the
+  hidden editor instead.
+- Autoscroll stops when its sheet unloads, such as when another note opens in
+  the same tab.
+- A set list rendered in the hidden view mode no longer reports the last song
+  as current when you switch to it.
 - The capo chip is hidden when the capo is 0.
 - The Sounding/Shapes button is now a **Shapes** toggle with a stable label;
   off shows sounding pitch.
@@ -26,12 +38,22 @@
   `aria-pressed`, and control groups are labeled for screen readers.
 - Per-block listeners are released when Obsidian re-renders a block instead of
   accumulating until the plugin unloads.
-- Mobile toolbar and setlist navigation controls now use touch-sized targets
-  and remain reachable during performance.
-- Chord diagram popovers stay inside the viewport and close on outside tap.
 - The README has a centered hero, a feature grid with Lucide icons, and
   light/dark images for the write → get example, toolbar anatomy, and set
   lists. The toolbar reference and the BRAT and manual installs are collapsed.
+
+## 0.7.0 — 2026-08-12
+
+### Added
+
+- Performance mode keeps the screen awake on supported platforms and safely
+  falls back when Screen Wake Lock is unavailable.
+
+### Changed
+
+- Mobile toolbar and setlist navigation controls now use touch-sized targets
+  and remain reachable during performance.
+- Chord diagram popovers stay inside the viewport and close on outside tap.
 
 ## 0.6.0 — 2026-07-21
 

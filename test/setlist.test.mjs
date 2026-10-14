@@ -7,6 +7,7 @@ import {
   songDurationSec,
   formatDuration,
   summaryLabel,
+  currentIndex,
 } from "../setlist.mjs";
 
 test("parseSetlist extracts link targets, stripping alias/heading", () => {
@@ -56,8 +57,22 @@ test("summaryLabel shows count, known duration, and missing songs", () => {
   assert.equal(summaryLabel(2, 2, 0), "2 songs · 2 missing");
 });
 
-// Roadmap 0.8 exit gate, node-level: 20 songs + one broken link, three full
-// navigation cycles in each direction return to the start without skips.
+test("summaryLabel calls out untimed songs only beside a partial total", () => {
+  assert.equal(summaryLabel(20, 1, 3085, 5), "20 songs · 51:25 · 5 untimed · 1 missing");
+  assert.equal(summaryLabel(4, 0, 0, 4), "4 songs");
+  assert.equal(summaryLabel(4, 0, 600, 0), "4 songs · 10:00");
+});
+
+test("currentIndex picks the last item past the reading line", () => {
+  assert.equal(currentIndex([-900, -100, 250, 900], 300), 2);
+  assert.equal(currentIndex([400, 900], 300), 0); // none reached yet: the first
+  assert.equal(currentIndex([0, 0, 0], 300), 2); // why hidden renders are skipped
+  assert.equal(currentIndex([], 300), 0);
+});
+
+// Roadmap 0.8 exit gate, node-level: 20 songs with mixed durations + one
+// broken link, three full navigation cycles in each direction return to the
+// start without skips.
 test("exit gate: 20-song setlist with one broken link", () => {
   const names = Array.from({ length: 20 }, (_, i) => `Song ${i + 1}`);
   const fixture = [...names.map((n) => `- [[${n}]]`), "- [[Missing Song]]"].join("\n");
@@ -65,7 +80,18 @@ test("exit gate: 20-song setlist with one broken link", () => {
   assert.equal(targets.length, 21);
   assert.equal(targets[20], "Missing Song");
 
-  assert.equal(summaryLabel(21, 1, 20 * 180), "21 songs · 1:00:00 · 1 missing");
+  // Every fourth song is untimed; the rest mix block and frontmatter durations.
+  const notes = names.map((_, i) =>
+    i % 4 === 3 ? "```leadsheet\n[C]la\n```"
+      : i % 2 ? `---\nduration: ${120 + i}\n---\n\n\`\`\`leadsheet\n[C]la\n\`\`\``
+        : `\`\`\`leadsheet\n{duration: ${120 + i}}\n[C]la\n\`\`\``
+  );
+  const secs = notes.map(songDurationSec);
+  const known = secs.reduce((a, s) => a + (s ?? 0), 0);
+  const untimed = secs.filter((s) => s === null).length;
+  assert.equal(untimed, 5);
+  assert.equal(known, 15 * 120 + [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18].reduce((a, b) => a + b));
+  assert.equal(summaryLabel(21, 1, known, untimed), `21 songs · ${formatDuration(known)} · 5 untimed · 1 missing`);
 
   let cur = 0;
   for (let i = 0; i < 3 * 21; i++) cur = nextIndex(cur, 21);
