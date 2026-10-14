@@ -10,6 +10,9 @@ import {
   currentIndex,
 } from "../setlist.mjs";
 
+// summaryLabel keeps no-break spaces inside each part; compare as plain text.
+const label = (...args) => summaryLabel(...args).replace(/\u00a0/g, " ");
+
 test("parseSetlist extracts link targets, stripping alias/heading", () => {
   const src = "- [[Song A]]\n- [[Song B|Bee]]\n[[Song C#Chorus]]\njust a note\n";
   assert.deepEqual(parseSetlist(src), ["Song A", "Song B", "Song C"]);
@@ -51,16 +54,20 @@ test("formatDuration renders m:ss and rolls into hours", () => {
 });
 
 test("summaryLabel shows count, known duration, and missing songs", () => {
-  assert.equal(summaryLabel(20, 1, 3725), "20 songs · 1:02:05 · 1 missing");
-  assert.equal(summaryLabel(1, 0, 90), "1 song · 1:30");
-  assert.equal(summaryLabel(3, 0, 0), "3 songs");
-  assert.equal(summaryLabel(2, 2, 0), "2 songs · 2 missing");
+  assert.equal(label(20, 1, 3725), "20 songs · 1:02:05 · 1 missing");
+  assert.equal(label(1, 0, 90), "1 song · 1:30");
+  assert.equal(label(3, 0, 0), "3 songs");
+  assert.equal(label(2, 2, 0), "2 songs · 2 missing");
+});
+
+test("summaryLabel wraps only between parts", () => {
+  assert.equal(summaryLabel(21, 1, 3085, 5), "21\u00a0songs · 51:25 · 5\u00a0untimed · 1\u00a0missing");
 });
 
 test("summaryLabel calls out untimed songs only beside a partial total", () => {
-  assert.equal(summaryLabel(20, 1, 3085, 5), "20 songs · 51:25 · 5 untimed · 1 missing");
-  assert.equal(summaryLabel(4, 0, 0, 4), "4 songs");
-  assert.equal(summaryLabel(4, 0, 600, 0), "4 songs · 10:00");
+  assert.equal(label(20, 1, 3085, 5), "20 songs · 51:25 · 5 untimed · 1 missing");
+  assert.equal(label(4, 0, 0, 4), "4 songs");
+  assert.equal(label(4, 0, 600, 0), "4 songs · 10:00");
 });
 
 test("currentIndex picks the last item past the reading line", () => {
@@ -91,7 +98,7 @@ test("exit gate: 20-song setlist with one broken link", () => {
   const untimed = secs.filter((s) => s === null).length;
   assert.equal(untimed, 5);
   assert.equal(known, 15 * 120 + [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18].reduce((a, b) => a + b));
-  assert.equal(summaryLabel(21, 1, known, untimed), `21 songs · ${formatDuration(known)} · 5 untimed · 1 missing`);
+  assert.equal(label(21, 1, known, untimed), `21 songs · ${formatDuration(known)} · 5 untimed · 1 missing`);
 
   let cur = 0;
   for (let i = 0; i < 3 * 21; i++) cur = nextIndex(cur, 21);

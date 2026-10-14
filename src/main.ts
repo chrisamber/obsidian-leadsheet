@@ -1,6 +1,7 @@
 import {
   App,
   Component,
+  debounce,
   Keymap,
   MarkdownRenderChild,
   MarkdownView,
@@ -316,7 +317,9 @@ export default class LeadsheetPlugin extends Plugin {
     if (this.scrollSheet === sheet) this.stopAutoscroll();
   }
 
+  // A no-op when idle, so Prev/Next do not redraw every sheet's play button.
   stopAutoscroll() {
+    if (!this.scrollEl) return;
     const body = this.scrollEl?.doc.body ?? activeDocument.body;
     if (this.scrollRaf) (this.scrollEl?.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
     this.scrollRaf = 0;
@@ -630,12 +633,21 @@ function renderSetlist(
   updatePos();
 
   // Follow manual scrolling: the current song is the last one whose top has
-  // reached the upper 40% of the view. Paused briefly after Prev/Next so a
-  // short final song that cannot scroll to the top still stays selected, and
-  // while hidden (the other view mode), where every top reads as 0.
-  let navUntil = 0;
-  const observer = new IntersectionObserver(() => {
-    if (Date.now() < navUntil || !el.isShown()) return;
+  // reached the upper 40% of the view. Prev/Next own the position until their
+  // smooth scroll settles: a long jump passes other songs on the way, and a
+  // short final song never reaches the line. Hidden renders (the other view
+  // mode) are skipped too, since every top reads as 0 there.
+  let navigating = false;
+  const settle = debounce(() => (navigating = false), 250, true);
+  owner.register(() => settle.cancel());
+  owner.registerDomEvent(el.doc, "scroll", () => {
+    if (navigating) settle();
+  }, { capture: true });
+  // Observers come from the block's own window: one from the main window never
+  // fires for a set list open in a popout.
+  const win = el.win as Window & typeof globalThis;
+  const observer = new win.IntersectionObserver(() => {
+    if (navigating || !el.isShown()) return;
     const i = currentIndex(
       anchors.map((a) => a.getBoundingClientRect().top),
       el.win.innerHeight * 0.4
@@ -648,13 +660,49 @@ function renderSetlist(
   anchors.forEach((a) => observer.observe(a));
   owner.register(() => observer.disconnect());
 
+  // Offsets below the bar follow its real height, which grows when the
+  // summary wraps on a phone.
+  const navSize = new win.ResizeObserver(() =>
+    el.style.setProperty("--ls-setlist-nav-h", `${nav.offsetHeight}px`)
+  );
+  navSize.observe(nav);
+  owner.register(() => navSize.disconnect());
+
+  // Prev/Next glide the song to just below the bar. Driven per frame because
+  // Reading view unloads sections above the set list mid-scroll, which cancels
+  // native smooth scrolling; re-measuring every frame also absorbs that shift.
+  let glide = 0;
+  owner.register(() => el.win.cancelAnimationFrame(glide));
+  const scrollToSong = (target: HTMLElement) => {
+    const scroller = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
+    if (!scroller) return;
+    const win = el.win;
+    // The bar pins inside the scroller's top padding, which a CSS scroll
+    // margin cannot see, so measure both.
+    const dest = () => scroller.scrollTop + target.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top -
+      parseFloat(win.getComputedStyle(scroller).paddingTop) - nav.offsetHeight - 8;
+    const from = scroller.scrollTop;
+    const ms = win.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300;
+    let start = 0;
+    const frame = (ts: number) => {
+      if (!start) start = ts;
+      const t = ms ? Math.min(1, (ts - start) / ms) : 1;
+      scroller.scrollTop = from + (dest() - from) * (1 - (1 - t) ** 3);
+      glide = t < 1 ? win.requestAnimationFrame(frame) : 0;
+    };
+    win.cancelAnimationFrame(glide);
+    glide = win.requestAnimationFrame(frame);
+  };
+
   // Navigating always stops autoscroll so playback never bleeds into the next song.
   const go = (i: number) => {
     plugin.stopAutoscroll();
     cur = i;
-    navUntil = Date.now() + 1000;
+    navigating = true;
+    settle();
     updatePos();
-    anchors[cur]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (anchors[cur]) scrollToSong(anchors[cur]);
   };
   iconButton(buttons, "chevron-left", "Previous song", "◀").onclick =
     () => go(prevIndex(cur, anchors.length));

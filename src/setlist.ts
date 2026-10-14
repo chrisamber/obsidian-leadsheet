@@ -21,12 +21,13 @@ export function formatDuration(sec: number): string {
 }
 
 // Untimed songs are only called out next to a partial total; when no song has
-// a duration there is no total for them to qualify.
+// a duration there is no total for them to qualify. Parts keep a no-break
+// space so a narrow bar wraps between them, never inside one.
 export function summaryLabel(total: number, missing: number, knownSec: number, untimed = 0): string {
-  const parts = [`${total} song${total === 1 ? "" : "s"}`];
+  const parts = [`${total}\u00a0song${total === 1 ? "" : "s"}`];
   if (knownSec > 0) parts.push(formatDuration(knownSec));
-  if (knownSec > 0 && untimed > 0) parts.push(`${untimed} untimed`);
-  if (missing > 0) parts.push(`${missing} missing`);
+  if (knownSec > 0 && untimed > 0) parts.push(`${untimed}\u00a0untimed`);
+  if (missing > 0) parts.push(`${missing}\u00a0missing`);
   return parts.join(" · ");
 }
 

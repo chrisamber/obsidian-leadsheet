@@ -555,7 +555,7 @@ body.leadsheet-perf .leadsheet:not(.ls-nested) > .ls-toolbar {
 
 .leadsheet-setlist .ls-setlist-song {
   margin-top: 2.2em;
-  scroll-margin-top: 4.5em;
+  scroll-margin-top: calc(var(--ls-setlist-nav-h, 4em) + 0.5em);
 }
 .leadsheet-setlist .ls-setlist-divider {
   display: flex;
@@ -654,6 +654,6 @@ body.leadsheet-perf .leadsheet:not(.ls-nested) > .ls-toolbar {
   }
 
   body.leadsheet-perf .leadsheet-setlist .leadsheet .ls-toolbar {
-    top: 66px;
+    top: var(--ls-setlist-nav-h, 66px);
   }
 }

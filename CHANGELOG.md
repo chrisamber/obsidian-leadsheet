@@ -31,6 +31,16 @@
   the same tab.
 - A set list rendered in the hidden view mode no longer reports the last song
   as current when you switch to it.
+- Prev/Next land each song just below the set-list bar. In Reading view the
+  song's first line used to sit under the bar, and long jumps (last song back
+  to the first) could stop partway when Obsidian unloaded content above the
+  set list mid-scroll. The jump is instant with reduced motion.
+- The position label stays on the chosen song until the jump settles instead
+  of picking up songs passed on the way.
+- On phones in performance mode, song toolbars pin under the set-list bar's
+  real height (exposed as `--ls-setlist-nav-h`), including when the summary
+  wraps or the set list is in a popout window. The summary wraps between
+  parts, never inside one.
 - The capo chip is hidden when the capo is 0.
 - The Sounding/Shapes button is now a **Shapes** toggle with a stable label;
   off shows sounding pitch.
