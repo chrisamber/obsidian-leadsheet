@@ -62,6 +62,15 @@ const DEFAULT_SETTINGS: LeadsheetSettings = {
   showDiagrams: false,
 };
 
+// Reading view and Live Preview scroll containers.
+const SCROLLER = ".markdown-preview-view, .cm-scroller";
+
+// Where the current song is read: 40% down the window. The set-list position
+// label and the autoscroll command must agree on it.
+function readingLine(win: Window): number {
+  return win.innerHeight * 0.4;
+}
+
 export default class LeadsheetPlugin extends Plugin {
   settings: LeadsheetSettings = DEFAULT_SETTINGS;
   private scrollEl: HTMLElement | null = null;
@@ -296,7 +305,7 @@ export default class LeadsheetPlugin extends Plugin {
     }
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     const scroller = Array.from(
-      view?.containerEl.querySelectorAll<HTMLElement>(".markdown-preview-view, .cm-scroller") ?? []
+      view?.containerEl.querySelectorAll<HTMLElement>(SCROLLER) ?? []
     ).find((el) => el.isShown());
     if (!scroller) return;
     const plays = Array.from(scroller.querySelectorAll<HTMLButtonElement>(".leadsheet .ls-play"));
@@ -304,11 +313,11 @@ export default class LeadsheetPlugin extends Plugin {
       this.toggleAutoscroll(scroller);
       return;
     }
-    // Same reading line and anchors as the set-list position label.
+    // Same anchors as the set-list position label.
     const tops = plays.map((play) =>
       (play.closest(".ls-setlist-song") ?? play.closest(".leadsheet"))!.getBoundingClientRect().top
     );
-    plays[currentIndex(tops, scroller.win.innerHeight * 0.4)].click();
+    plays[currentIndex(tops, readingLine(scroller.win))].click();
   }
 
   // A sheet that unloads (another file in the leaf, a re-render) takes its
@@ -319,14 +328,14 @@ export default class LeadsheetPlugin extends Plugin {
 
   // A no-op when idle, so Prev/Next do not redraw every sheet's play button.
   stopAutoscroll() {
-    if (!this.scrollEl) return;
-    const body = this.scrollEl?.doc.body ?? activeDocument.body;
-    if (this.scrollRaf) (this.scrollEl?.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
+    const el = this.scrollEl;
+    if (!el) return;
+    if (this.scrollRaf) (el.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
     this.scrollRaf = 0;
     this.scrollEl = null;
     this.scrollSheet = null;
-    const win = body.doc.defaultView;
-    if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
+    const win = el.doc.defaultView;
+    if (win) el.doc.body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
   }
 
   // Change speed by delta px/s. Persists the manual fallback and, if a scroll
@@ -458,7 +467,7 @@ function renderLeadsheet(
   updatePlay();
   updateSpeed();
   play.onclick = () => {
-    const scrollEl = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
+    const scrollEl = el.closest<HTMLElement>(SCROLLER);
     if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec, el);
     updatePlay();
     updateSpeed();
@@ -632,26 +641,22 @@ function renderSetlist(
   updateSummary();
   updatePos();
 
+  // Observers and frames come from the block's own window: an observer from
+  // the main window never fires for a set list open in a popout.
+  const win = el.win as Window & typeof globalThis;
+
   // Follow manual scrolling: the current song is the last one whose top has
-  // reached the upper 40% of the view. Prev/Next own the position until their
-  // smooth scroll settles: a long jump passes other songs on the way, and a
-  // short final song never reaches the line. Hidden renders (the other view
-  // mode) are skipped too, since every top reads as 0 there.
+  // reached the reading line (the root margin limits callbacks to the upper
+  // 40%). Prev/Next own the position until 250ms after their glide's last
+  // frame: a long jump passes other songs on the way, and a short final song
+  // never reaches the line. Hidden renders (the other view mode) are skipped
+  // too, since every top reads as 0 there.
   let navigating = false;
   const settle = debounce(() => (navigating = false), 250, true);
   owner.register(() => settle.cancel());
-  owner.registerDomEvent(el.doc, "scroll", () => {
-    if (navigating) settle();
-  }, { capture: true });
-  // Observers come from the block's own window: one from the main window never
-  // fires for a set list open in a popout.
-  const win = el.win as Window & typeof globalThis;
   const observer = new win.IntersectionObserver(() => {
     if (navigating || !el.isShown()) return;
-    const i = currentIndex(
-      anchors.map((a) => a.getBoundingClientRect().top),
-      el.win.innerHeight * 0.4
-    );
+    const i = currentIndex(anchors.map((a) => a.getBoundingClientRect().top), readingLine(win));
     if (i !== cur) {
       cur = i;
       updatePos();
@@ -672,23 +677,23 @@ function renderSetlist(
   // Reading view unloads sections above the set list mid-scroll, which cancels
   // native smooth scrolling; re-measuring every frame also absorbs that shift.
   let glide = 0;
-  owner.register(() => el.win.cancelAnimationFrame(glide));
+  owner.register(() => win.cancelAnimationFrame(glide));
   const scrollToSong = (target: HTMLElement) => {
-    const scroller = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
+    const scroller = el.closest<HTMLElement>(SCROLLER);
     if (!scroller) return;
-    const win = el.win;
-    // The bar pins inside the scroller's top padding, which a CSS scroll
-    // margin cannot see, so measure both.
-    const dest = () => scroller.scrollTop + target.getBoundingClientRect().top -
-      scroller.getBoundingClientRect().top -
-      parseFloat(win.getComputedStyle(scroller).paddingTop) - nav.offsetHeight - 8;
+    // Where the song's top lands. The bar pins inside the scroller's top
+    // padding, which a CSS scroll margin cannot see, so measure both.
+    const landAt = scroller.getBoundingClientRect().top +
+      parseFloat(win.getComputedStyle(scroller).paddingTop) + nav.offsetHeight + 8;
     const from = scroller.scrollTop;
     const ms = win.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300;
     let start = 0;
     const frame = (ts: number) => {
       if (!start) start = ts;
       const t = ms ? Math.min(1, (ts - start) / ms) : 1;
-      scroller.scrollTop = from + (dest() - from) * (1 - (1 - t) ** 3);
+      const dest = scroller.scrollTop + target.getBoundingClientRect().top - landAt;
+      scroller.scrollTop = from + (dest - from) * (1 - (1 - t) ** 3);
+      settle();
       glide = t < 1 ? win.requestAnimationFrame(frame) : 0;
     };
     win.cancelAnimationFrame(glide);

@@ -97,8 +97,8 @@ test("exit gate: 20-song setlist with one broken link", () => {
   const known = secs.reduce((a, s) => a + (s ?? 0), 0);
   const untimed = secs.filter((s) => s === null).length;
   assert.equal(untimed, 5);
-  assert.equal(known, 15 * 120 + [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18].reduce((a, b) => a + b));
-  assert.equal(label(21, 1, known, untimed), `21 songs · ${formatDuration(known)} · 5 untimed · 1 missing`);
+  assert.equal(known, 1935);
+  assert.equal(label(21, 1, known, untimed), "21 songs · 32:15 · 5 untimed · 1 missing");
 
   let cur = 0;
   for (let i = 0; i < 3 * 21; i++) cur = nextIndex(cur, 21);
