@@ -1,6 +1,7 @@
 import {
   App,
   Component,
+  debounce,
   Keymap,
   MarkdownRenderChild,
   MarkdownView,
@@ -13,6 +14,7 @@ import { parse, Segment, SongLine, transposeKey, isValidChord } from "./parser";
 import {
   clampCapo,
   scrollSpeedForDuration,
+  autoscrollEnd,
   chordPopoverPlacement,
   shouldHoldWakeLock,
   sectionKind,
@@ -28,6 +30,7 @@ import {
   songDurationSec,
   summaryLabel,
   formatDuration,
+  currentIndex,
   SONG_BLOCK_RE,
 } from "./setlist";
 import { ChordShape, chordDiagramData, uniqueChords } from "./diagrams";
@@ -59,9 +62,31 @@ const DEFAULT_SETTINGS: LeadsheetSettings = {
   showDiagrams: false,
 };
 
+// Reading view and Live Preview scroll containers.
+const SCROLLER = ".markdown-preview-view, .cm-scroller";
+
+// The box that actually scrolls a block. An embedded note's inner preview view
+// matches SCROLLER but never scrolls itself, so look for real overflow first:
+// the embed when it overflows, otherwise the host note's scroller.
+function scrollerOf(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const { overflowY } = p.win.getComputedStyle(p);
+    if (/auto|scroll|overlay/.test(overflowY) && p.scrollHeight > p.clientHeight) return p;
+  }
+  return el.closest<HTMLElement>(SCROLLER);
+}
+
+// Where the current song is read: 40% down the scroller's visible box, so a
+// pane in a split or an embed reads its own line. The set-list position label
+// and the autoscroll command must agree on it.
+function readingLine(scroller: HTMLElement): number {
+  return scroller.getBoundingClientRect().top + scroller.clientHeight * 0.4;
+}
+
 export default class LeadsheetPlugin extends Plugin {
   settings: LeadsheetSettings = DEFAULT_SETTINGS;
   private scrollEl: HTMLElement | null = null;
+  private scrollSheet: HTMLElement | null = null; // sheet whose play started the scroll
   private scrollRaf = 0;
   private liveSpeed = 0; // px/s of the active scroll; adjustable mid-scroll
   private openChordTrigger: HTMLButtonElement | null = null;
@@ -121,13 +146,7 @@ export default class LeadsheetPlugin extends Plugin {
     this.addCommand({
       id: "toggle-autoscroll",
       name: "Toggle autoscroll",
-      callback: () => {
-        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        const el = view?.containerEl.querySelector(
-          ".markdown-preview-view, .cm-scroller"
-        ) as HTMLElement | null;
-        if (el) this.toggleAutoscroll(el);
-      },
+      callback: () => this.toggleAutoscrollCommand(),
     });
 
     this.addSettingTab(new LeadsheetSettingTab(this.app, this));
@@ -244,28 +263,49 @@ export default class LeadsheetPlugin extends Plugin {
     return this.scrollEl !== null;
   }
 
-  // Duration sets the pace when available; otherwise use the saved speed.
-  toggleAutoscroll(el: HTMLElement, durationSec = 0) {
+  // Duration sets the pace when available; otherwise use the saved speed. A
+  // sheet inside a set list scrolls through its own song only: the pace comes
+  // from that song's height and playback stops at its last line.
+  toggleAutoscroll(el: HTMLElement, durationSec = 0, sheet: HTMLElement | null = null) {
     if (this.scrollEl) {
       this.stopAutoscroll();
       return;
     }
+    const bound = sheet?.closest<HTMLElement>(".ls-setlist-song") ?? null;
     this.scrollEl = el;
+    this.scrollSheet = sheet;
     const win = el.win;
-    const derived = scrollSpeedForDuration(el.scrollHeight - el.clientHeight, durationSec);
+    const contentPx = (bound ? bound.offsetHeight : el.scrollHeight) - el.clientHeight;
+    const derived = scrollSpeedForDuration(contentPx, durationSec);
     this.liveSpeed = derived > 0 ? derived : this.settings.scrollSpeed;
+    // Re-measured every frame: songs above may still be rendering.
+    const end = () => {
+      const max = el.scrollHeight - el.clientHeight;
+      if (!bound) return max;
+      return autoscrollEnd(
+        el.scrollTop,
+        max,
+        bound.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom
+      );
+    };
     let pos = el.scrollTop;
+    let wrote = pos; // scrollTop as last set, read back after the browser snaps it
     let lastTs = 0;
     const step = (ts: number) => {
-      if (!this.scrollEl) return;
+      if (this.scrollEl !== el) return;
       if (lastTs) {
-        pos += (this.liveSpeed * (ts - lastTs)) / 1000;
-        this.scrollEl.scrollTop = pos;
-        // stop at the bottom
-        if (pos >= this.scrollEl.scrollHeight - this.scrollEl.clientHeight) {
+        // Carry on from wherever something else moved the view since the last
+        // frame: scroll anchoring as songs above render, Reading view shifting
+        // content, or the user's own wheel or drag.
+        pos += el.scrollTop - wrote;
+        const stop = end();
+        if (pos >= stop) {
           this.stopAutoscroll();
           return;
         }
+        pos = Math.min(pos + (this.liveSpeed * (ts - lastTs)) / 1000, stop);
+        el.scrollTop = pos;
+        wrote = el.scrollTop;
       }
       lastTs = ts;
       this.scrollRaf = win.requestAnimationFrame(step);
@@ -273,13 +313,47 @@ export default class LeadsheetPlugin extends Plugin {
     this.scrollRaf = win.requestAnimationFrame(step);
   }
 
+  // The command plays the sheet at the reading line exactly as its own play
+  // button would (duration pace, set-list bounds). A note without a sheet
+  // scrolls at the saved speed.
+  private toggleAutoscrollCommand() {
+    if (this.scrollEl) {
+      this.stopAutoscroll();
+      return;
+    }
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const scroller = Array.from(
+      view?.containerEl.querySelectorAll<HTMLElement>(SCROLLER) ?? []
+    ).find((el) => el.isShown());
+    if (!scroller) return;
+    const plays = Array.from(scroller.querySelectorAll<HTMLButtonElement>(".leadsheet .ls-play"));
+    if (!plays.length) {
+      this.toggleAutoscroll(scroller);
+      return;
+    }
+    // Same anchors as the set-list position label.
+    const tops = plays.map((play) =>
+      (play.closest(".ls-setlist-song") ?? play.closest(".leadsheet"))!.getBoundingClientRect().top
+    );
+    plays[currentIndex(tops, readingLine(scroller))].click();
+  }
+
+  // A sheet that unloads (another file in the leaf, a re-render) takes its
+  // playback with it, so the scroller never keeps running under other content.
+  releaseAutoscroll(sheet: HTMLElement) {
+    if (this.scrollSheet === sheet) this.stopAutoscroll();
+  }
+
+  // A no-op when idle, so Prev/Next do not redraw every sheet's play button.
   stopAutoscroll() {
-    const body = this.scrollEl?.doc.body ?? activeDocument.body;
-    if (this.scrollRaf) (this.scrollEl?.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
+    const el = this.scrollEl;
+    if (!el) return;
+    if (this.scrollRaf) (el.win ?? activeWindow).cancelAnimationFrame(this.scrollRaf);
     this.scrollRaf = 0;
     this.scrollEl = null;
-    const win = body.doc.defaultView;
-    if (win) body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
+    this.scrollSheet = null;
+    const win = el.doc.defaultView;
+    if (win) el.doc.body.dispatchEvent(new win.CustomEvent("leadsheet-scroll-stopped"));
   }
 
   // Change speed by delta px/s. Persists the manual fallback and, if a scroll
@@ -411,8 +485,8 @@ function renderLeadsheet(
   updatePlay();
   updateSpeed();
   play.onclick = () => {
-    const scrollEl = el.closest<HTMLElement>(".markdown-preview-view, .cm-scroller");
-    if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec);
+    const scrollEl = scrollerOf(el);
+    if (scrollEl) plugin.toggleAutoscroll(scrollEl, durationSec, el);
     updatePlay();
     updateSpeed();
   };
@@ -423,6 +497,7 @@ function renderLeadsheet(
     updateSpeed();
   });
   owner.registerDomEvent(hostBody, "leadsheet-speed-changed", updateSpeed);
+  owner.register(() => plugin.releaseAutoscroll(el));
 
   // --- font size (global; drives --ls-font-scale) ---
   const setFont = async (scale: number) => {
@@ -530,8 +605,9 @@ function renderSetlist(
   // Total duration accumulates as song files resolve; the label stays honest
   // about what is known so far rather than blocking on all reads.
   let knownSec = 0;
+  let untimed = 0;
   const updateSummary = () =>
-    (summary.textContent = summaryLabel(targets.length, missing, knownSec));
+    (summary.textContent = summaryLabel(targets.length, missing, knownSec, untimed));
   const updatePos = () => {
     pos.empty();
     if (!targets.length) return;
@@ -571,10 +647,9 @@ function renderSetlist(
     void plugin.app.vault.cachedRead(dest)
       .then((text: string) => {
         const sec = songDurationSec(text);
-        if (sec) {
-          knownSec += sec;
-          updateSummary();
-        }
+        if (sec) knownSec += sec;
+        else untimed++;
+        updateSummary();
         const m = text.match(SONG_BLOCK_RE);
         if (m) renderLeadsheet(plugin, owner, m[1], songEl.createDiv({ cls: "ls-nested" }), dest.path);
         else songEl.createDiv({ cls: "ls-meta", text: "No leadsheet block in this note." });
@@ -585,31 +660,87 @@ function renderSetlist(
   updatePos();
 
   // Follow manual scrolling: the current song is the last one whose top has
-  // reached the upper 40% of the view. Paused briefly after Prev/Next so a
-  // short final song that cannot scroll to the top still stays selected.
-  let navUntil = 0;
-  const observer = new IntersectionObserver(() => {
-    if (Date.now() < navUntil) return;
-    const line = el.win.innerHeight * 0.4;
-    let i = 0;
-    anchors.forEach((a, j) => {
-      if (a.getBoundingClientRect().top <= line) i = j;
-    });
+  // reached the reading line of whichever box scrolled (the note, or an embed
+  // holding the set list). A capture listener on the document hears scrolls
+  // from any of them; scroll events arrive at most once a frame. Prev/Next own
+  // the position until 250ms after their glide's last frame: a long jump
+  // passes other songs on the way, and a short final song never reaches the
+  // line. Hidden renders (the other view mode) are skipped too, since every
+  // top reads as 0 there.
+  let navigating = false;
+  const settle = debounce(() => (navigating = false), 250, true);
+  owner.register(() => settle.cancel());
+  const follow = (event: Event) => {
+    const scroller = event.target as Node;
+    if (navigating || !scroller.instanceOf(HTMLElement) || !scroller.contains(el) || !el.isShown()) return;
+    const i = currentIndex(anchors.map((a) => a.getBoundingClientRect().top), readingLine(scroller));
     if (i !== cur) {
       cur = i;
       updatePos();
     }
-  }, { rootMargin: "0px 0px -60% 0px" });
-  anchors.forEach((a) => observer.observe(a));
-  owner.register(() => observer.disconnect());
+  };
+
+  // Listeners, observers and frames belong to the window the block is shown
+  // in, so they attach on insertion. A block can render before it is attached,
+  // in another window's document: a listener bound then never hears scrolls
+  // in the popout it lands in.
+  let win = el.win as Window & typeof globalThis;
+  let unbind: (() => void) | null = null;
+  const bind = () => {
+    if (unbind && el.win === win) return;
+    unbind?.();
+    win = el.win as Window & typeof globalThis;
+    const doc = el.doc;
+    doc.addEventListener("scroll", follow, { capture: true });
+    // Offsets below the bar follow its real height, which grows when the
+    // summary wraps on a phone.
+    const navSize = new win.ResizeObserver(() =>
+      el.style.setProperty("--ls-setlist-nav-h", `${nav.offsetHeight}px`)
+    );
+    navSize.observe(nav);
+    unbind = () => {
+      doc.removeEventListener("scroll", follow, { capture: true });
+      navSize.disconnect();
+    };
+  };
+  owner.register(el.onNodeInserted(bind));
+  owner.register(() => unbind?.());
+
+  // Prev/Next glide the song to just below the bar. Driven per frame because
+  // Reading view unloads sections above the set list mid-scroll, which cancels
+  // native smooth scrolling; re-measuring every frame also absorbs that shift.
+  let glide = 0;
+  owner.register(() => win.cancelAnimationFrame(glide));
+  const scrollToSong = (target: HTMLElement) => {
+    const scroller = scrollerOf(el);
+    if (!scroller) return;
+    // Where the song's top lands. The bar pins inside the scroller's top
+    // padding, which a CSS scroll margin cannot see, so measure both.
+    const landAt = scroller.getBoundingClientRect().top +
+      parseFloat(win.getComputedStyle(scroller).paddingTop) + nav.offsetHeight + 8;
+    const from = scroller.scrollTop;
+    const ms = win.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 300;
+    let start = 0;
+    const frame = (ts: number) => {
+      if (!start) start = ts;
+      const t = ms ? Math.min(1, (ts - start) / ms) : 1;
+      const dest = scroller.scrollTop + target.getBoundingClientRect().top - landAt;
+      scroller.scrollTop = from + (dest - from) * (1 - (1 - t) ** 3);
+      settle();
+      glide = t < 1 ? win.requestAnimationFrame(frame) : 0;
+    };
+    win.cancelAnimationFrame(glide);
+    glide = win.requestAnimationFrame(frame);
+  };
 
   // Navigating always stops autoscroll so playback never bleeds into the next song.
   const go = (i: number) => {
     plugin.stopAutoscroll();
     cur = i;
-    navUntil = Date.now() + 1000;
+    navigating = true;
+    settle();
     updatePos();
-    anchors[cur]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (anchors[cur]) scrollToSong(anchors[cur]);
   };
   iconButton(buttons, "chevron-left", "Previous song", "◀").onclick =
     () => go(prevIndex(cur, anchors.length));

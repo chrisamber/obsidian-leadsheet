@@ -7,7 +7,11 @@ import {
   songDurationSec,
   formatDuration,
   summaryLabel,
+  currentIndex,
 } from "../setlist.mjs";
+
+// summaryLabel keeps no-break spaces inside each part; compare as plain text.
+const label = (...args) => summaryLabel(...args).replace(/\u00a0/g, " ");
 
 test("parseSetlist extracts link targets, stripping alias/heading", () => {
   const src = "- [[Song A]]\n- [[Song B|Bee]]\n[[Song C#Chorus]]\njust a note\n";
@@ -50,14 +54,32 @@ test("formatDuration renders m:ss and rolls into hours", () => {
 });
 
 test("summaryLabel shows count, known duration, and missing songs", () => {
-  assert.equal(summaryLabel(20, 1, 3725), "20 songs · 1:02:05 · 1 missing");
-  assert.equal(summaryLabel(1, 0, 90), "1 song · 1:30");
-  assert.equal(summaryLabel(3, 0, 0), "3 songs");
-  assert.equal(summaryLabel(2, 2, 0), "2 songs · 2 missing");
+  assert.equal(label(20, 1, 3725), "20 songs · 1:02:05 · 1 missing");
+  assert.equal(label(1, 0, 90), "1 song · 1:30");
+  assert.equal(label(3, 0, 0), "3 songs");
+  assert.equal(label(2, 2, 0), "2 songs · 2 missing");
 });
 
-// Roadmap 0.8 exit gate, node-level: 20 songs + one broken link, three full
-// navigation cycles in each direction return to the start without skips.
+test("summaryLabel wraps only between parts", () => {
+  assert.equal(summaryLabel(21, 1, 3085, 5), "21\u00a0songs · 51:25 · 5\u00a0untimed · 1\u00a0missing");
+});
+
+test("summaryLabel calls out untimed songs only beside a partial total", () => {
+  assert.equal(label(20, 1, 3085, 5), "20 songs · 51:25 · 5 untimed · 1 missing");
+  assert.equal(label(4, 0, 0, 4), "4 songs");
+  assert.equal(label(4, 0, 600, 0), "4 songs · 10:00");
+});
+
+test("currentIndex picks the last item past the reading line", () => {
+  assert.equal(currentIndex([-900, -100, 250, 900], 300), 2);
+  assert.equal(currentIndex([400, 900], 300), 0); // none reached yet: the first
+  assert.equal(currentIndex([0, 0, 0], 300), 2); // why hidden renders are skipped
+  assert.equal(currentIndex([], 300), 0);
+});
+
+// Roadmap 0.8 exit gate, node-level: 20 songs with mixed durations + one
+// broken link, three full navigation cycles in each direction return to the
+// start without skips.
 test("exit gate: 20-song setlist with one broken link", () => {
   const names = Array.from({ length: 20 }, (_, i) => `Song ${i + 1}`);
   const fixture = [...names.map((n) => `- [[${n}]]`), "- [[Missing Song]]"].join("\n");
@@ -65,7 +87,18 @@ test("exit gate: 20-song setlist with one broken link", () => {
   assert.equal(targets.length, 21);
   assert.equal(targets[20], "Missing Song");
 
-  assert.equal(summaryLabel(21, 1, 20 * 180), "21 songs · 1:00:00 · 1 missing");
+  // Every fourth song is untimed; the rest mix block and frontmatter durations.
+  const notes = names.map((_, i) =>
+    i % 4 === 3 ? "```leadsheet\n[C]la\n```"
+      : i % 2 ? `---\nduration: ${120 + i}\n---\n\n\`\`\`leadsheet\n[C]la\n\`\`\``
+        : `\`\`\`leadsheet\n{duration: ${120 + i}}\n[C]la\n\`\`\``
+  );
+  const secs = notes.map(songDurationSec);
+  const known = secs.reduce((a, s) => a + (s ?? 0), 0);
+  const untimed = secs.filter((s) => s === null).length;
+  assert.equal(untimed, 5);
+  assert.equal(known, 1935);
+  assert.equal(label(21, 1, known, untimed), "21 songs · 32:15 · 5 untimed · 1 missing");
 
   let cur = 0;
   for (let i = 0; i < 3 * 21; i++) cur = nextIndex(cur, 21);

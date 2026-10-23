@@ -12,6 +12,13 @@ export function scrollSpeedForDuration(contentPx: number, durationSec: number): 
   return durationSec > 0 ? contentPx / durationSec : 0;
 }
 
+// Scroll position where a bounded autoscroll stops: the bound's bottom edge
+// meets the view's bottom edge (`overshootPx` is how far below it sits now),
+// never past the scroller's own end.
+export function autoscrollEnd(scrollTop: number, maxScroll: number, overshootPx: number): number {
+  return Math.max(0, Math.min(maxScroll, scrollTop + overshootPx));
+}
+
 interface Bounds {
   left: number;
   top: number;
