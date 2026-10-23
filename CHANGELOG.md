@@ -29,6 +29,8 @@
   hidden editor instead.
 - Autoscroll stops when its sheet unloads, such as when another note opens in
   the same tab.
+- Autoscroll carries on from wherever the view moves while it plays (your own
+  scroll, or a song above finishing rendering) instead of jumping back.
 - A set list rendered in the hidden view mode no longer reports the last song
   as current when you switch to it.
 - Prev/Next land each song just below the set-list bar. In Reading view the
@@ -37,6 +39,11 @@
   set list mid-scroll. The jump is instant with reduced motion.
 - The position label stays on the chosen song until the jump settles instead
   of picking up songs passed on the way.
+- Prev/Next and play work in a set list embedded in another note
+  (`![[Gig Setlist]]`); they used to do nothing there.
+- The current song is read 40% down its own pane rather than the window, so
+  the position label follows scrolling in a split pane, and in a popout whose
+  set list rendered while another window was active.
 - On phones in performance mode, song toolbars pin under the set-list bar's
   real height (exposed as `--ls-setlist-nav-h`), including when the summary
   wraps or the set list is in a popout window. The summary wraps between
